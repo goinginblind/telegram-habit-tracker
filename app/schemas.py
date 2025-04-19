@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+
 class HabitCreate(BaseModel):
     name: str
     is_daily: bool = True

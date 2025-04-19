@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
+
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+
 from app.routes.habits import get_db
 from app import models, schemas
+
 from datetime import datetime, timezone
 
 from typing import List, Optional
+
 
 router = APIRouter()
 
@@ -27,7 +31,7 @@ def toggle_completion(habit_id: int, completion: schemas.CompletionCreate, db: S
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit Not Found")
     
-    if habit != "binary":
+    if habit.type != "binary":
         raise HTTPException(status_code=400, detail="This endpoint supports binary type only (for now)")
     
     today = datetime.now(timezone.utc).date()

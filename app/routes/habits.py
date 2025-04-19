@@ -3,8 +3,12 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
+from app.routes.completions import get_completions_for_habit
 
 from typing import List
+
+from datetime import datetime, timedelta, timezone
+
 
 router = APIRouter()
 
@@ -53,6 +57,7 @@ def untrack_habit(habit_id: int, db: Session = Depends(get_db)):
     db.refresh(habit)
     return
 
+# Track a habit, bring back from the soft delete
 @router.patch("/habits/{habit_id}/track")
 def track_habit(habit_id: int, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(models.Habit.id == habit_id).first()
@@ -63,3 +68,26 @@ def track_habit(habit_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(habit)
     return
+
+# Get habit streak
+@router.get("/habits/{habit_id}/streak")
+def get_streak(habit_id: int, db: Session = Depends(get_db)):
+    completions = get_completions_for_habit(habit_id=habit_id, db=db)
+    completions = sorted(completions, key=lambda c: c.completed_at, reverse=True)
+
+    if not completions:
+        return 0
+    
+    today, streak = datetime.now(timezone.utc).date(), 0
+    day_ptr = today
+
+    for completion in completions:
+        completion_day = completion.completed_at.date()
+
+        if completion_day == day_ptr:
+            streak += 1
+            day_ptr -= timedelta(days=1)
+        elif completion_day < day_ptr:
+            break
+
+    return streak

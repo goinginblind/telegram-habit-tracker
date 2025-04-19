@@ -1,7 +1,9 @@
 from fastapi import FastAPI
+
 from app import models, database
 from app.routes import habits
 from app.routes import completions
+
 
 app = FastAPI()
 
