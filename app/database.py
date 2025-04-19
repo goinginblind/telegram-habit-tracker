@@ -16,3 +16,10 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 # Base is the class for models to inherit from
 Base = declarative_base()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
