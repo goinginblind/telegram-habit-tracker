@@ -18,7 +18,7 @@ def get_db():
 
 @router.post("/habits")
 def create_habit(habit: schemas.HabitCreate, db: Session = Depends(get_db)):
-    db_habit = models.Habit(name=habit.name, is_daily=habit.is_daily)
+    db_habit = models.Habit(name=habit.name, is_daily=habit.is_daily, tracked=habit.tracked)
     db.add(db_habit)
     db.commit()
     db.refresh(db_habit)

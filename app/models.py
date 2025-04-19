@@ -7,3 +7,4 @@ class Habit(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     is_daily = Column(Boolean, default=True)
+    tracked = Column(Boolean, default=True)
