@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from sqlalchemy import Enum as SqlEnum
-from enum import Enum
+from sqlalchemy import Enum as SQLAlchemyEnum
+from app.schemas import RepeatType
 
 from datetime import datetime, timezone
 
@@ -13,10 +13,10 @@ class Habit(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    is_daily = Column(Boolean, default=True)
     tracked = Column(Boolean, default=True)
+    repeat_type = Column(SQLAlchemyEnum(RepeatType), default=RepeatType.DAILY)
     type = Column(String, default="binary")
-    
+
     completions = relationship("HabitCompletion", back_populates="habit", cascade="all, delete")
 
 

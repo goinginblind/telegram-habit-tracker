@@ -15,7 +15,7 @@ router = APIRouter()
 # Create a new habit
 @router.post("/habits")
 def create_habit(habit: schemas.HabitCreate, db: Session = Depends(get_db)):
-    db_habit = models.Habit(name=habit.name, is_daily=habit.is_daily, tracked=habit.tracked)
+    db_habit = models.Habit(name=habit.name, repeat_type=habit.repeat_type, tracked=habit.tracked)
     db.add(db_habit)
     db.commit()
     db.refresh(db_habit)
@@ -99,7 +99,7 @@ def get_habits_for_today(db: Session = Depends(get_db)):
     habits = db.query(models.Habit).filter(models.Habit.tracked == True).all()
     habits_today = []
     for habit in habits:
-        if habit.is_daily:
+        if habit.repeat_type == "daily":
             habits_today.append(habit)
     
     return habits_today
