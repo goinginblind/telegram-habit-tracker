@@ -14,8 +14,9 @@ class Habit(BaseModel):
     is_daily: bool
     tracked: bool
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
 class CompletionBase(BaseModel):
@@ -30,5 +31,6 @@ class CompletionRead(CompletionBase):
     id: int
     habit_id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }

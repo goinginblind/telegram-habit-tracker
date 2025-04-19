@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from routes.habits import get_db
-import models, schemas
+from app.routes.habits import get_db
+from app import models, schemas
 from datetime import datetime, timezone
 
 router = APIRouter()
@@ -18,7 +18,7 @@ def log_completion(habit_id: int, completion: schemas.CompletionCreate, db: Sess
         habit_id=habit_id,
         completed_at=completed_at
     )
-    
+
     db.add(new_completion)
     db.commit()
     db.refresh(new_completion)
