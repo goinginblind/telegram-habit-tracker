@@ -13,6 +13,7 @@ class Habit(Base):
     name = Column(String, index=True)
     is_daily = Column(Boolean, default=True)
     tracked = Column(Boolean, default=True)
+    type = Column(String, default="binary")
 
     completions = relationship("HabitCompletion", back_populates="habit", cascade="all, delete")
 

@@ -5,9 +5,10 @@ from app.routes import completions
 
 app = FastAPI()
 
-@app.get("/ping")
-def ping():
-    return {"message": "pong"}
+# Behold, a LEGACY feature!
+#@app.get("/ping")
+#def ping():
+#    return {"message": "pong"}
 
 models.Base.metadata.create_all(bind=database.engine)
 

@@ -13,6 +13,7 @@ class Habit(BaseModel):
     name: str
     is_daily: bool
     tracked: bool
+    type: Optional[str] = "binary"
 
     model_config = {
         "from_attributes": True
