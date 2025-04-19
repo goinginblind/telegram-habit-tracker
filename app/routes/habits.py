@@ -79,15 +79,27 @@ def get_streak(habit_id: int, db: Session = Depends(get_db)):
         return 0
     
     today, streak = datetime.now(timezone.utc).date(), 0
-    day_ptr = today
 
-    for completion in completions:
+    for i, completion in enumerate(completions):
         completion_day = completion.completed_at.date()
+        expected_date = today - timedelta(days=streak)
 
-        if completion_day == day_ptr:
+        if completion_day == expected_date:
             streak += 1
-            day_ptr -= timedelta(days=1)
-        elif completion_day < day_ptr:
+        elif completion_day < expected_date:
             break
 
     return streak
+
+# NEED to add more types than just daily tho... fo shoo
+@router.get("/habits/today")
+def get_habits_for_today(db: Session = Depends(get_db)):
+    today = datetime.now(timezone.utc).date()
+
+    habits = db.query(models.Habit).filter(models.Habit.tracked == True).all()
+    habits_today = []
+    for habit in habits:
+        if habit.is_daily:
+            habits_today.append(habit)
+    
+    return habits_today
