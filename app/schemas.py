@@ -12,11 +12,18 @@ class RepeatType(str, Enum):
     CUSTOM = "custom"  
 
 
+class HabitType(str, Enum):
+    BINARY = "binary"
+    COUNTABLE = "countable"
+    LIMIT = "limit"
+
+
 class HabitCreate(BaseModel):
     name: str
     repeat_type: RepeatType = RepeatType.DAILY
     tracked: bool = True
     user_id: int
+    type: HabitType = HabitType.BINARY
 
 
 class Habit(BaseModel):
@@ -25,7 +32,8 @@ class Habit(BaseModel):
     name: str
     repeat_type: RepeatType
     tracked: bool
-    type: Optional[str] = "binary"
+    type: HabitType
+    target: Optional[int] = None
 
     model_config = {
         "from_attributes": True

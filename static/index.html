@@ -1,47 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Habit Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    const API_BASE = "http://localhost:8000"; // Change if hosted
+    const API_BASE = "https://6db2-45-85-105-105.ngrok-free.app";  
+    const tg = window.Telegram?.WebApp;
+    const userId = tg?.initDataUnsafe?.user?.id || 1;
 
     async function loadHabits() {
-      const userId = 1; // or make this dynamic
-      const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=1`);
+      const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
       const habits = await res.json();
       const container = document.getElementById("habit-list");
       container.innerHTML = "";
 
       for (let habit of habits) {
-        const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions`);
+        const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
         const completions = await compRes.json();
         const today = new Date().toISOString().split("T")[0];
-        const completedToday = completions.some(c => c.completed_at.startsWith(today));
+        const completedToday = completions.some((c) =>
+          c.completed_at.startsWith(today)
+        );
 
         const card = document.createElement("div");
-        card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${completedToday ? 'bg-green-100 border-green-300' : 'bg-white border-gray-200'}`;
+        card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
+          completedToday
+            ? "bg-green-100 border-green-300"
+            : "bg-white border-gray-200"
+        }`;
 
         card.innerHTML = `
           <div class="flex justify-between items-center">
             <div>
               <h2 class="text-lg font-semibold">${habit.name}</h2>
-              <p class="text-sm text-gray-500">${habit.repeat_type} • ${habit.tracked ? 'Tracked' : 'Untracked'}</p>
+              <p class="text-sm text-gray-500">
+                ${habit.repeat_type} • ${habit.tracked ? "Tracked" : "Untracked"}
+              </p>
             </div>
             <button class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm">
-              ${completedToday ? 'Uncheck' : 'Mark done'}
+              ${completedToday ? "Uncheck" : "Mark done"}
             </button>
           </div>
         `;
 
-        const button = card.querySelector("button");
-        button.onclick = async () => {
+        card.querySelector("button").onclick = async () => {
           await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userId }),
           });
           loadHabits();
         };
@@ -52,7 +60,6 @@
 
     async function createHabit(event) {
       event.preventDefault();
-      const userId = document.getElementById("user-id").value;
       const name = document.getElementById("habit-name").value;
       const repeatType = document.getElementById("repeat-type").value;
       const tracked = document.getElementById("tracked").checked;
@@ -62,7 +69,12 @@
       await fetch(`${API_BASE}/habits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, repeat_type: repeatType, tracked, user_id: parseInt(userId) })
+        body: JSON.stringify({
+          name,
+          repeat_type: repeatType,
+          tracked,
+          user_id: userId,
+        }),
       });
 
       document.getElementById("habit-form").reset();
@@ -75,9 +87,17 @@
 <body class="bg-gray-50 p-4 font-sans">
   <h1 class="text-2xl font-bold mb-4">Today's Habits</h1>
 
-  <form id="habit-form" onsubmit="createHabit(event)" class="mb-6 space-y-2 bg-white p-4 rounded-xl shadow-md">
-    <input type="number" id="user-id" placeholder="User ID" class="w-full border p-2 rounded" />
-    <input type="text" id="habit-name" placeholder="Habit name" class="w-full border p-2 rounded">
+  <form
+    id="habit-form"
+    onsubmit="createHabit(event)"
+    class="mb-6 space-y-2 bg-white p-4 rounded-xl shadow-md"
+  >
+    <input
+      type="text"
+      id="habit-name"
+      placeholder="Habit name"
+      class="w-full border p-2 rounded"
+    />
 
     <div class="flex gap-2 items-center">
       <label class="text-sm">Repeat:</label>
@@ -88,14 +108,15 @@
         <option value="monthly">Monthly</option>
         <option value="custom">Custom</option>
       </select>
-
       <label class="text-sm ml-4 flex items-center gap-1">
-        <input type="checkbox" id="tracked" checked>
+        <input type="checkbox" id="tracked" checked />
         Tracked
       </label>
     </div>
 
-    <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Habit</button>
+    <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+      Add Habit
+    </button>
   </form>
 
   <div id="habit-list"></div>
