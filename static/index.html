@@ -5,32 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Habit Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
-    const API_BASE = "https://6db2-45-85-105-105.ngrok-free.app";  
-    const tg = window.Telegram?.WebApp;
-    const userId = tg?.initDataUnsafe?.user?.id || 1;
-
+    const API_BASE = "https://6db2-45-85-105-105.ngrok-free.app";
+  
+    let userId = null;
+  
+    function getTodayDate() {
+      return new Date().toISOString().split("T")[0];
+    }
+  
     async function loadHabits() {
+      if (!userId) return;
+  
       const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
       const habits = await res.json();
       const container = document.getElementById("habit-list");
       container.innerHTML = "";
-
+  
       for (let habit of habits) {
         const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
         const completions = await compRes.json();
-        const today = new Date().toISOString().split("T")[0];
-        const completedToday = completions.some((c) =>
-          c.completed_at.startsWith(today)
-        );
-
+        const completedToday = completions.some((c) => c.completed_at.startsWith(getTodayDate()));
+  
         const card = document.createElement("div");
         card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
-          completedToday
-            ? "bg-green-100 border-green-300"
-            : "bg-white border-gray-200"
+          completedToday ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
         }`;
-
+  
         card.innerHTML = `
           <div class="flex justify-between items-center">
             <div>
@@ -44,7 +46,7 @@
             </button>
           </div>
         `;
-
+  
         card.querySelector("button").onclick = async () => {
           await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
             method: "POST",
@@ -53,19 +55,19 @@
           });
           loadHabits();
         };
-
+  
         container.appendChild(card);
       }
     }
-
+  
     async function createHabit(event) {
       event.preventDefault();
       const name = document.getElementById("habit-name").value;
       const repeatType = document.getElementById("repeat-type").value;
       const tracked = document.getElementById("tracked").checked;
-
+  
       if (!name.trim()) return;
-
+  
       await fetch(`${API_BASE}/habits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,12 +78,25 @@
           user_id: userId,
         }),
       });
-
+  
       document.getElementById("habit-form").reset();
       loadHabits();
     }
-
-    window.onload = loadHabits;
+  
+    window.onload = () => {
+      console.log("Telegram WebApp:", window.Telegram?.WebApp);
+      console.log("initDataUnsafe:", window.Telegram?.WebApp?.initDataUnsafe);
+      console.log("user:", window.Telegram?.WebApp?.initDataUnsafe?.user);
+      const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  
+      if (!user || !user.id) {
+        alert("Could not detect Telegram user ID. Make sure you're using the Mini App inside Telegram.");
+        return;
+      }
+  
+      userId = user.id;
+      loadHabits();
+    };
   </script>
 </head>
 <body class="bg-gray-50 p-4 font-sans">
