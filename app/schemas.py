@@ -16,10 +16,12 @@ class HabitCreate(BaseModel):
     name: str
     repeat_type: RepeatType = RepeatType.DAILY
     tracked: bool = True
+    user_id: int
 
 
 class Habit(BaseModel):
     id: int
+    user_id: int
     name: str
     repeat_type: RepeatType
     tracked: bool
@@ -31,6 +33,7 @@ class Habit(BaseModel):
 
 
 class CompletionBase(BaseModel):
+    user_id: int
     completed_at: Optional[datetime] = None
 
 
