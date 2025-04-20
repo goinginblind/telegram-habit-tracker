@@ -51,7 +51,7 @@ def toggle_completion(habit_id: int, completion: schemas.CompletionCreate, db: S
         return create_completion(habit_id=habit_id, db=db)
 
 
-@router.get("/habits/{habit_id}/complete", response_model=List[schemas.CompletionRead])
+@router.get("/habits/{habit_id}/completions", response_model=List[schemas.CompletionRead])
 def get_completions_for_habit(habit_id: int, db: Session = Depends(get_db)):
     completions = db.query(models.HabitCompletion).filter(models.HabitCompletion.habit_id == habit_id).all()
     return completions
