@@ -11,26 +11,85 @@
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
     const userId = user?.id;
 
+    let todayHabitsCache = []
+
     if (!userId) {
-      console.error("Could not detect Telegram user ID");
+      alert("Could not detect your Telegram user ID. Please open this app via Telegram.");
     }
 
     async function loadHabits() {
-      const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
+    const container = document.getElementById("today-habit-list");
+
+    // Hide content before refresh
+    container.classList.remove("opacity-100");
+    container.classList.add("opacity-0");
+
+    const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
+    const habits = await res.json();
+    container.innerHTML = "";
+
+    for (let habit of habits) {
+      const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
+      const completions = await compRes.json();
+      const today = new Date().toISOString().split("T")[0];
+      const completedToday = completions.some((c) =>
+        c.completed_at.startsWith(today)
+      );
+
+      const card = document.createElement("div");
+      card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
+        completedToday ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
+      }`;
+
+      card.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-semibold">${habit.name}</h2>
+            <p class="text-sm text-gray-500">
+              ${habit.repeat_type} • ${habit.tracked ? "Tracked" : "Untracked"}
+            </p>
+          </div>
+          <button class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm">
+            ${completedToday ? "Uncheck" : "Mark done"}
+          </button>
+        </div>
+      `;
+
+      card.querySelector("button").onclick = async () => {
+        await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId }),
+        });
+        loadHabits(); // Refresh after marking done
+      };
+
+      container.appendChild(card);
+    }
+
+    // Smoothly show the updated list
+    setTimeout(() => {
+      container.classList.remove("opacity-0");
+      container.classList.add("opacity-100");
+    }, 10); // Short delay ensures rendering has started
+  }
+
+
+    async function loadAllHabits() {
+      const container = document.getElementById("manage-habit-list");
+
+      // Fade out old content
+      container.classList.remove("opacity-100");
+      container.classList.add("opacity-0");
+
+      const res = await fetch(`${API_BASE}/habits?user_id=${userId}`);
       const habits = await res.json();
-      const container = document.getElementById("today-habit-list");
       container.innerHTML = "";
 
       for (let habit of habits) {
-        const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
-        const completions = await compRes.json();
-        const today = new Date().toISOString().split("T")[0];
-        const completedToday = completions.some((c) => c.completed_at.startsWith(today));
-
         const card = document.createElement("div");
-        card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
-          completedToday ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
-        }`;
+        card.className =
+          "rounded-xl shadow-md p-4 mb-4 transition border bg-white border-gray-200";
 
         card.innerHTML = `
           <div class="flex justify-between items-center">
@@ -40,35 +99,17 @@
                 ${habit.repeat_type} • ${habit.tracked ? "Tracked" : "Untracked"}
               </p>
             </div>
-            <button class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm">
-              ${completedToday ? "Uncheck" : "Mark done"}
-            </button>
           </div>
         `;
 
-        card.querySelector("button").onclick = async () => {
-          await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId }),
-          });
-          loadHabits();
-        };
-
         container.appendChild(card);
       }
-    }
 
-    async function loadAllHabits() {
-      const res = await fetch(`${API_BASE}/habits?user_id=${userId}`);
-      const habits = await res.json();
-      const container = document.getElementById("manage-habit-list");
-      container.innerHTML = habits.map(h => `
-        <div class="p-3 border rounded mb-2 shadow bg-white">
-          <h3 class="font-semibold">${h.name}</h3>
-          <p class="text-sm text-gray-500">${h.repeat_type} • ${h.tracked ? "Tracked" : "Untracked"}</p>
-        </div>
-      `).join("");
+      // Fade in after a short delay
+      setTimeout(() => {
+        container.classList.remove("opacity-0");
+        container.classList.add("opacity-100");
+      }, 10);
     }
 
     function loadHeatmap() {
@@ -134,13 +175,13 @@
     <!-- Today Page -->
     <section id="page-today">
       <h1 class="text-2xl font-bold mb-4">Today's Habits</h1>
-      <div id="today-habit-list"></div>
+      <div id="today-habit-list" class="opacity-0 transition-opacity duration-300"></div>
     </section>
 
     <!-- Manage Page -->
     <section id="page-manage" class="hidden">
       <h1 class="text-2xl font-bold mb-4">Manage Habits</h1>
-      <div id="manage-habit-list"></div>
+      <div id="manage-habit-list" class="opacity-0 transition-opacity duration-300"></div>
     </section>
 
     <!-- Progress Page -->
