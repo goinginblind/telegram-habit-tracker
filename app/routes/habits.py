@@ -6,7 +6,7 @@ from app.database import get_db
 from app.schemas import HabitUpdate, RepeatType
 from app.routes.completions import get_completions_for_habit
 
-from typing import List
+from typing import Dict, List
 
 from datetime import date, datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
@@ -188,3 +188,19 @@ def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
     if not habit:
         raise HTTPException(status_code=404, detail="Habit not found")
     return habit
+
+# Get ttodays progress
+@router.get("progress/today", response_model=Dict[str, float])
+def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
+    habits = get_habits_for_today(user_id=user_id, db=db)
+    completions_count = 0
+    total_count = len(habits)
+    today = datetime.now().date()
+
+    for habit in habits:
+        completions = get_completions_for_habit(user_id=user_id, habit_id=habit.id, db=db)
+        if any(c.completed_at.date == today for c in completions):
+            completions_count += 1
+    
+    return {"progress": completions_count / total_count * 100 if total_count > 0 else 0}
+    

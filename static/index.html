@@ -12,8 +12,6 @@
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
     const userId = user?.id;
 
-    let todayHabitsCache = [];
-
     if (!userId) {
       alert("Could not detect your Telegram user ID. Please open this app via Telegram.");
     }
@@ -27,6 +25,21 @@
 
       const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
       const habits = await res.json();
+      let completed = 0;
+      for (let habit of habits) {
+        const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
+        const completions = await compRes.json();
+        const today = new Date().toISOString().split("T")[0];
+        const completedToday = completions.some((c) => c.completed_at.startsWith(today));
+        if (completedToday) completed++;
+      }
+
+      // Calculate progress percentage
+      const percent = habits.length ? (completed / habits.length) * 100 : 0;
+
+      // Update progress circle
+      document.getElementById("progress-path").setAttribute("stroke-dasharray", `${percent}, 100`);
+      document.getElementById("progress-text").textContent = `${Math.round(percent)}%`;
       
       container.innerHTML = "";
 
@@ -140,7 +153,7 @@
       if (id === "manage") loadAllHabits();
       if (id === "progress") loadHeatmap();
 
-      lucide.createIcons(); // <- rerender icons after page change
+      lucide.createIcons(); 
     }
 
     function openAddHabitModal() {
@@ -252,6 +265,42 @@
     <!-- Today Page -->
     <section id="page-today">
       <h1 class="text-2xl font-bold mb-4">Today's Habits</h1>
+      <div class="mb-6">
+        <div class="text-center text-gray-500 text-sm mb-1">
+          Today’s Progress
+        </div>
+        <div class="flex justify-center">
+          <div class="relative w-28 h-28">
+            <svg class="w-full h-full" viewBox="0 0 36 36">
+              <path
+                class="text-gray-300 fill-none stroke-[3]"
+                stroke-linecap="round"
+                d="M18 2.0845
+                   a 15.9155 15.9155 0 0 1 0 31.831
+                   a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <path
+                id="progress-path"
+                class="fill-none stroke-green-500 stroke-[3]"
+                stroke-linecap="round"
+                stroke-dasharray="0, 100"
+                d="M18 2.0845
+                   a 15.9155 15.9155 0 0 1 0 31.831
+                   a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <text
+                id="progress-text"
+                x="18"
+                y="20.35"
+                class="fill-black text-[8px] text-center"
+                text-anchor="middle"
+              >
+                0%
+              </text>
+            </svg>
+          </div>
+        </div>
+      </div>      
       <div id="today-habit-list" class="opacity-0 transition-opacity duration-300"></div>
     </section>
 
@@ -352,3 +401,4 @@
   </div>
 </body>
 </html>
+
