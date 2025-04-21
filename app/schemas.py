@@ -41,6 +41,17 @@ class Habit(BaseModel):
         "from_attributes": True
     }
 
+class HabitUpdate(BaseModel):
+    name: Optional[int]
+    repeat_type: Optional[str]
+    start_day: Optional[date]
+    tracked: Optional[bool]
+
+    
+    model_config = {
+        "from_attributes": True
+    }
+
 
 class CompletionBase(BaseModel):
     user_id: int

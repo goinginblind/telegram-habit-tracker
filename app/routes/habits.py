@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
+from app.schemas import HabitUpdate
 from app.routes.completions import get_completions_for_habit
 
 from typing import List
@@ -112,8 +113,8 @@ def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
 
     return streak
 
-# NEED to add more types than just daily tho... fo shoo
-@router.get("/habits/today")
+# Gets todays habits
+@router.get("/habits/today", response_model=List[schemas.Habit])
 def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
     today = datetime.now(timezone.utc).date()
 
@@ -146,3 +147,29 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
             pass
     
     return habits_today
+
+# Edit habits
+@router.put("/habits/{habit_id}")
+def update_habit(user_id: int, habit_id: int, habit_data: HabitUpdate, db: Session = Depends(get_db)):
+    habit = db.query(models.Habit).filter(
+        models.Habit.user_id == user_id,
+        models.Habit.habit_id == habit_id
+    ).first()
+
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    
+    for field, value in habit_data.model_dump(exclude_unset=True).items():
+        setattr(habit, field, value)
+
+    db.commit()
+    db.refresh(habit)
+    return habit
+
+# Get one (user_id specific) habit
+@router.get("/habits/{habit_id}", response_model=schemas.Habit)
+def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
+    habit = db.query(models.Habit).filter_by(id=habit_id, user_id=user_id).first()
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    return habit

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Habit Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -11,69 +11,65 @@
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
     const userId = user?.id;
 
-    let todayHabitsCache = []
+    let todayHabitsCache = [];
 
     if (!userId) {
       alert("Could not detect your Telegram user ID. Please open this app via Telegram.");
     }
 
     async function loadHabits() {
-    const container = document.getElementById("today-habit-list");
+      const container = document.getElementById("today-habit-list");
 
-    // Hide content before refresh
-    container.classList.remove("opacity-100");
-    container.classList.add("opacity-0");
+      // Hide content before refresh
+      container.classList.remove("opacity-100");
+      container.classList.add("opacity-0");
 
-    const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
-    const habits = await res.json();
-    container.innerHTML = "";
+      const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
+      const habits = await res.json();
+      container.innerHTML = "";
 
-    for (let habit of habits) {
-      const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
-      const completions = await compRes.json();
-      const today = new Date().toISOString().split("T")[0];
-      const completedToday = completions.some((c) =>
-        c.completed_at.startsWith(today)
-      );
+      for (let habit of habits) {
+        const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
+        const completions = await compRes.json();
+        const today = new Date().toISOString().split("T")[0];
+        const completedToday = completions.some((c) => c.completed_at.startsWith(today));
 
-      const card = document.createElement("div");
-      card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
-        completedToday ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
-      }`;
+        const card = document.createElement("div");
+        card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
+          completedToday ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
+        }`;
 
-      card.innerHTML = `
-        <div class="flex justify-between items-center">
-          <div>
-            <h2 class="text-lg font-semibold">${habit.name}</h2>
-            <p class="text-sm text-gray-500">
-              ${habit.repeat_type} • ${habit.tracked ? "Tracked" : "Untracked"}
-            </p>
+        card.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div class="flex-1 cursor-pointer">
+              <h2 class="text-lg font-semibold">${habit.name}</h2>
+              <p class="text-sm text-gray-500">
+                ${habit.repeat_type} • ${habit.tracked ? "Tracked" : "Untracked"}
+              </p>
+            </div>
+            <button class="text-gray-500 hover:text-black px-2" onclick="editHabit(${habit.id})">⋮</button>
           </div>
-          <button class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm">
-            ${completedToday ? "Uncheck" : "Mark done"}
-          </button>
-        </div>
-      `;
+        `;
 
-      card.querySelector("button").onclick = async () => {
-        await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: userId }),
-        });
-        loadHabits(); // Refresh after marking done
-      };
+        card.onclick = async (e) => {
+          if (e.target.tagName === "BUTTON") return;
+          await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userId }),
+          });
+          loadHabits(); // Refresh after marking done
+        };
 
-      container.appendChild(card);
+        container.appendChild(card);
+      }
+
+      // Smoothly show the updated list
+      setTimeout(() => {
+        container.classList.remove("opacity-0");
+        container.classList.add("opacity-100");
+      }, 10); // Short delay ensures rendering has started
     }
-
-    // Smoothly show the updated list
-    setTimeout(() => {
-      container.classList.remove("opacity-0");
-      container.classList.add("opacity-100");
-    }, 10); // Short delay ensures rendering has started
-  }
-
 
     async function loadAllHabits() {
       const container = document.getElementById("manage-habit-list");
@@ -165,6 +161,49 @@
       loadHabits();
     }
 
+    function closeEditHabitModal() {
+      document.getElementById("edit-habit-modal").classList.add("hidden");
+    }
+
+    async function editHabit(id) {
+      const res = await fetch(`${API_BASE}/habits/${id}?user_id=${userId}`);
+      const habit = await res.json();
+
+      document.getElementById("edit-habit-id").value = habit.id;
+      document.getElementById("edit-habit-name").value = habit.name;
+      document.getElementById("edit-repeat-type").value = habit.repeat_type;
+      document.getElementById("edit-start-date").value = habit.start_date;
+      document.getElementById("edit-tracked").checked = habit.tracked;
+
+      document.getElementById("edit-habit-modal").classList.remove("hidden");
+    }
+
+    async function submitEditHabit(event) {
+      event.preventDefault();
+
+      const id = document.getElementById("edit-habit-id").value;
+      const name = document.getElementById("edit-habit-name").value;
+      const repeat_type = document.getElementById("edit-repeat-type").value;
+      const start_date = document.getElementById("edit-start-date").value;
+      const tracked = document.getElementById("edit-tracked").checked;
+
+      await fetch(`${API_BASE}/habits/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          name,
+          repeat_type,
+          start_date,
+          tracked
+        })
+      });
+
+      closeEditHabitModal();
+      loadHabits();
+      loadAllHabits();
+    }
+
     window.onload = () => showPage("today");
   </script>
 </head>
@@ -200,6 +239,32 @@
   >
     +
   </button>
+
+  <!-- Edit Habit Modal -->
+  <div id="edit-habit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white p-4 rounded-xl shadow-lg w-[90%] max-w-md">
+      <form id="edit-habit-form" onsubmit="submitEditHabit(event)">
+        <input type="hidden" id="edit-habit-id" />
+        <input type="text" id="edit-habit-name" placeholder="Habit name" class="w-full border p-2 rounded mb-2" />
+        <select id="edit-repeat-type" class="border p-2 rounded w-full mb-2">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input type="date" id="edit-start-date" class="w-full border p-2 rounded mb-2" />
+        <label class="text-sm flex items-center gap-1 mb-2">
+          <input type="checkbox" id="edit-tracked" /> Tracked
+        </label>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeEditHabitModal()" class="text-gray-500">Cancel</button>
+          <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 
   <!-- Bottom Navigation -->
   <nav class="fixed bottom-0 left-0 w-full bg-white shadow-md flex justify-around py-2 z-40 border-t">
