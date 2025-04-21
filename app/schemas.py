@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from enum import Enum
 
@@ -21,6 +21,7 @@ class HabitType(str, Enum):
 class HabitCreate(BaseModel):
     name: str
     repeat_type: RepeatType = RepeatType.DAILY
+    start_date: Optional[date] = None
     tracked: bool = True
     user_id: int
     type: HabitType = HabitType.BINARY
@@ -31,6 +32,7 @@ class Habit(BaseModel):
     user_id: int
     name: str
     repeat_type: RepeatType
+    start_date: date
     tracked: bool
     type: HabitType
     target: Optional[int] = None

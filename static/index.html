@@ -150,13 +150,14 @@
       const name = document.getElementById("habit-name").value;
       const repeatType = document.getElementById("repeat-type").value;
       const tracked = document.getElementById("tracked").checked;
+      const startDate = document.getElementById("start-date").value;
 
       if (!name.trim()) return;
 
       await fetch(`${API_BASE}/habits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, repeat_type: repeatType, tracked, user_id: userId }),
+        body: JSON.stringify({ name, repeat_type: repeatType, tracked, user_id: userId, start_date: startDate }),
       });
 
       document.getElementById("habit-form").reset();
@@ -219,6 +220,7 @@
           <option value="monthly">Monthly</option>
           <option value="custom">Custom</option>
         </select>
+        <input type="date" id="start-date" class="w-full border p-2 rounded mb-2" />
         <label class="text-sm flex items-center gap-1 mb-2">
           <input type="checkbox" id="tracked" checked /> Tracked
         </label>

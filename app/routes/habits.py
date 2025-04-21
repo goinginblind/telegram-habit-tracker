@@ -121,10 +121,28 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
         models.Habit.tracked == True, 
         models.Habit.user_id == user_id
     ).all()
-    
+
     habits_today = []
     for habit in habits:
+        if habit.start_date > today:
+            continue
+
         if habit.repeat_type == "daily":
             habits_today.append(habit)
+
+        elif habit.repeat_type == "weekly":
+            if (today - habit.start_date).days % 7 == 0:
+                habits_today.append(habit)
+        
+        elif habit.repeat_type == "biweekly":
+            if (today - habit.start_date).days % 14 == 0:
+                habits_today.append(habit)
+        
+        elif habit.repeat_type == "monthly":
+            if habit.start_date.day == today.day:
+                habits_today.append(habit)
+        
+        elif habit.repeat_type == "custom":
+            pass
     
     return habits_today
