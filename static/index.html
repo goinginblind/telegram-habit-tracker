@@ -181,17 +181,29 @@
     async function submitEditHabit(event) {
       event.preventDefault();
 
-      const id = document.getElementById("edit-habit-id").value;
+      const user_id = userId;
+      const id = parseInt(document.getElementById("edit-habit-id").value, 10);
       const name = document.getElementById("edit-habit-name").value;
       const repeat_type = document.getElementById("edit-repeat-type").value;
       const start_date = document.getElementById("edit-start-date").value;
       const tracked = document.getElementById("edit-tracked").checked;
+
+      // Log data to debug
+      console.log("Submitting data:", {
+        user_id,
+        id,
+        name,
+        repeat_type,
+        start_date,
+        tracked
+      });
 
       await fetch(`${API_BASE}/habits/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: userId,
+          id,
           name,
           repeat_type,
           start_date,

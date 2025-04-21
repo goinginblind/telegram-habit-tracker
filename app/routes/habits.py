@@ -150,10 +150,10 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
 
 # Edit habits
 @router.put("/habits/{habit_id}")
-def update_habit(user_id: int, habit_id: int, habit_data: HabitUpdate, db: Session = Depends(get_db)):
+def update_habit(habit_id: int, habit_data: HabitUpdate, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(
-        models.Habit.user_id == user_id,
-        models.Habit.habit_id == habit_id
+        models.Habit.user_id == habit_data.user_id,
+        models.Habit.id == habit_id
     ).first()
 
     if not habit:

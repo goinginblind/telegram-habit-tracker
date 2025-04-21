@@ -42,9 +42,11 @@ class Habit(BaseModel):
     }
 
 class HabitUpdate(BaseModel):
-    name: Optional[int]
+    user_id: int
+    id: int
+    name: Optional[str]
     repeat_type: Optional[str]
-    start_day: Optional[date]
+    start_date: Optional[date]
     tracked: Optional[bool]
 
     
