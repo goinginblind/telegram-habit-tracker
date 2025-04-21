@@ -6,6 +6,7 @@
   <title>Habit Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script>
     const API_BASE = "https://6db2-45-85-105-105.ngrok-free.app";
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -26,6 +27,7 @@
 
       const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
       const habits = await res.json();
+      
       container.innerHTML = "";
 
       for (let habit of habits) {
@@ -33,18 +35,20 @@
         const completions = await compRes.json();
         const today = new Date().toISOString().split("T")[0];
         const completedToday = completions.some((c) => c.completed_at.startsWith(today));
+        const streakRes = await fetch(`${API_BASE}/habits/${habit.id}/streak?user_id=${userId}`);
+        const streak = await streakRes.json();
 
         const card = document.createElement("div");
         card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
           completedToday ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
         }`;
-
+        
         card.innerHTML = `
           <div class="flex justify-between items-center">
             <div class="flex-1 cursor-pointer">
               <h2 class="text-lg font-semibold">${habit.name}</h2>
               <p class="text-sm text-gray-500">
-                ${habit.repeat_type} • ${habit.tracked ? "Tracked" : "Untracked"}
+                ${habit.repeat_type} • 🔥 ${streak} day streak
               </p>
             </div>
             <button class="text-gray-500 hover:text-black px-2" onclick="editHabit(${habit.id})">⋮</button>
@@ -119,8 +123,11 @@
       const pages = ["today", "manage", "progress"];
       for (let page of pages) {
         document.getElementById(`page-${page}`).classList.add("hidden");
+        document.getElementById(`tab-${page}`).classList.remove("text-green-600", "font-semibold");
       }
+
       document.getElementById(`page-${id}`).classList.remove("hidden");
+      document.getElementById(`tab-${id}`).classList.add("text-green-600", "font-semibold");
 
       const fab = document.getElementById("add-habit-btn");
       if (id === "progress") {
@@ -132,6 +139,8 @@
       if (id === "today") loadHabits();
       if (id === "manage") loadAllHabits();
       if (id === "progress") loadHeatmap();
+
+      lucide.createIcons(); // <- rerender icons after page change
     }
 
     function openAddHabitModal() {
@@ -260,12 +269,12 @@
   </main>
 
   <!-- Add Habit FAB -->
-  <button 
+  <button
     id="add-habit-btn"
     onclick="openAddHabitModal()"
-    class="fixed bottom-20 right-4 bg-green-600 text-white p-4 rounded-full shadow-lg hover:bg-green-700 z-50"
+    class="fixed bottom-16 right-4 bg-green-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-green-700 z-50 transition-colors duration-200"
   >
-    +
+    <i data-lucide="plus" class="w-6 h-6"></i>
   </button>
 
   <!-- Edit Habit Modal -->
@@ -304,9 +313,18 @@
 
   <!-- Bottom Navigation -->
   <nav class="fixed bottom-0 left-0 w-full bg-white shadow-md flex justify-around py-2 z-40 border-t">
-    <button onclick="showPage('today')" class="text-sm font-medium">Today</button>
-    <button onclick="showPage('manage')" class="text-sm font-medium">Manage</button>
-    <button onclick="showPage('progress')" class="text-sm font-medium">Progress</button>
+    <button id="tab-today" onclick="showPage('today')" class="flex flex-col items-center gap-1 text-sm">
+      <i data-lucide="calendar-check" class="w-5 h-5"></i>
+      Today
+    </button>
+    <button id="tab-manage" onclick="showPage('manage')" class="flex flex-col items-center gap-1 text-sm">
+      <i data-lucide="settings" class="w-5 h-5"></i>
+      Manage
+    </button>
+    <button id="tab-progress" onclick="showPage('progress')" class="flex flex-col items-center gap-1 text-sm">
+      <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+      Progress
+    </button>
   </nav>
 
   <!-- Habit Modal -->

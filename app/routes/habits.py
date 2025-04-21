@@ -3,12 +3,13 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
-from app.schemas import HabitUpdate
+from app.schemas import HabitUpdate, RepeatType
 from app.routes.completions import get_completions_for_habit
 
 from typing import List
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from dateutil.relativedelta import relativedelta
 
 
 router = APIRouter()
@@ -94,24 +95,38 @@ def track_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
 # Get habit streak
 @router.get("/habits/{habit_id}/streak")
 def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
+    habit = get_habit(habit_id=habit_id, user_id=user_id, db=db)
     completions = get_completions_for_habit(user_id=user_id, habit_id=habit_id, db=db)
     completions = sorted(completions, key=lambda c: c.completed_at, reverse=True)
 
     if not completions:
         return 0
     
-    today, streak = datetime.now(timezone.utc).date(), 0
+    current_date, streak = datetime.now(timezone.utc).date(), 0
 
-    for i, completion in enumerate(completions):
-        completion_day = completion.completed_at.date()
-        expected_date = today - timedelta(days=streak)
+    for completion in completions:
+        completion_day = completion.completed_at.date() 
 
-        if completion_day == expected_date:
+        if completion_day == current_date:
             streak += 1
-        elif completion_day < expected_date:
+            current_date = get_expected_day(date=completion_day, repeat_type=habit.repeat_type)
+        elif completion_day < current_date:
             break
-
+    
     return streak
+# This thing counts the expected day to get us our STREAKSSS (2 DAYS NO LEETCODE)
+def get_expected_day(date: date, repeat_type: str) -> date:
+    if repeat_type == RepeatType.DAILY:
+        return date - timedelta(days=1)
+    elif repeat_type == RepeatType.WEEKLY:
+        return date - timedelta(days=7)
+    elif repeat_type == RepeatType.BIWEEKLY:
+        return date - timedelta(days=14)
+    elif repeat_type == RepeatType.MONTHLY:
+        return date - relativedelta(months=1)
+    else:
+        raise NotImplementedError("Custom is not yet supported :(")
+
 
 # Gets todays habits
 @router.get("/habits/today", response_model=List[schemas.Habit])
