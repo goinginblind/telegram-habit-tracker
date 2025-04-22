@@ -226,4 +226,34 @@ def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
             completions_count += 1
     
     return {"progress": completions_count / total_count * 100 if total_count > 0 else 0}
-    
+
+
+# Gets todays summary to lessen load from the frontend i guess
+@router.get("/habits/today/summary")
+def get_today_summary(user_id: int, db: Session = Depends(get_db)):
+    today_str = date.today().isoformat()
+
+    # Step 1: Get all habits for this user that are active today
+    habits = db.query(models.Habit).filter(models.Habit.user_id == user_id).all()
+    habit_ids = [habit.id for habit in habits]
+
+    # Step 2: Get completions for today in one query
+    completions_today = db.query(models.HabitCompletion.habit_id).filter(
+        models.HabitCompletion.user_id == user_id,
+        models.HabitCompletion.completed_at.startswith(today_str)
+    ).all()
+    completed_today_ids = {row.habit_id for row in completions_today}
+
+    # Step 3: For each habit, compute streak
+    summary = []
+    for habit in habits:
+        streak = get_streak(user_id, habit.id, db)
+        summary.append({
+            "id": habit.id,
+            "name": habit.name,
+            "repeat_type": habit.repeat_type,
+            "completed_today": habit.id in completed_today_ids,
+            "streak": streak,
+        })
+
+    return summary

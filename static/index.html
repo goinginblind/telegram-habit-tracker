@@ -20,64 +20,51 @@
     async function loadHabits() {
       const container = document.getElementById("today-habit-list");
 
-      // Hide content before refresh
       container.classList.remove("opacity-100");
       container.classList.add("opacity-0");
 
-      const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
+      const res = await fetch(`${API_BASE}/habits/today/summary?user_id=${userId}`);
       const habits = await res.json();
+
       let completed = 0;
-      
       for (let habit of habits) {
-        const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
-        const completions = await compRes.json();
-        const today = new Date().toISOString().split("T")[0];
-        const completedToday = completions.some((c) => c.completed_at.startsWith(today));
-        if (completedToday) completed++;
+        if (habit.completed_today) completed++;
       }
 
-      // Calculate progress percentage
       const percent = habits.length ? (completed / habits.length) * 100 : 0;
-
       const currentProgressText = document.getElementById("progress-text").textContent.replace("%", "");
       const currentValue = parseInt(currentProgressText, 10) || 0;
       animateProgress(currentValue, percent);
-        if (Math.round(percent) === 100) {
-          setTimeout(() => {
-            confetti({
-              particleCount: 100,
-              spread: 70,
-              origin: { y: 0.6 }
-            });
-          }, 500); // delay so it pops after animation finishes
-        }
+
+      if (Math.round(percent) === 100) {
+        setTimeout(() => {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }, 500);
+      }
+
       document.getElementById("progress-wrapper").classList.add("opacity-100");
 
-      // Update progress circle
       document.getElementById("progress-path").setAttribute("stroke-dasharray", `${percent}, 100`);
       document.getElementById("progress-text").textContent = `${Math.round(percent)}%`;
-      
+
       container.innerHTML = "";
 
       for (let habit of habits) {
-        const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
-        const completions = await compRes.json();
-        const today = new Date().toISOString().split("T")[0];
-        const completedToday = completions.some((c) => c.completed_at.startsWith(today));
-        const streakRes = await fetch(`${API_BASE}/habits/${habit.id}/streak?user_id=${userId}`);
-        const streak = await streakRes.json();
-
         const card = document.createElement("div");
         card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
-          completedToday ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
+          habit.completed_today ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
         }`;
-        
+
         card.innerHTML = `
           <div class="flex justify-between items-center">
             <div class="flex-1 cursor-pointer">
               <h2 class="text-lg font-semibold">${habit.name}</h2>
               <p class="text-sm text-gray-500">
-                ${habit.repeat_type} • 🔥 ${streak} day streak
+                ${habit.repeat_type} • 🔥 ${habit.streak} day streak
               </p>
             </div>
             <button class="text-gray-500 hover:text-black px-2" onclick="editHabit(${habit.id})">⋮</button>
@@ -91,18 +78,18 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_id: userId }),
           });
-          loadHabits(); // Refresh after marking done
+          loadHabits(); // refresh
         };
 
         container.appendChild(card);
       }
 
-      // Smoothly show the updated list
       setTimeout(() => {
         container.classList.remove("opacity-0");
         container.classList.add("opacity-100");
       }, 10);
     }
+
 
     async function loadAllHabits() {
       const container = document.getElementById("manage-habit-list");
