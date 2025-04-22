@@ -22,3 +22,7 @@ pytest_cache/
 
 # macOS files
 .DS_Store
+
+# Misc
+indexRU.html
+bot.py
