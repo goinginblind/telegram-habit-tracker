@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script>
     const API_BASE = "https://6db2-45-85-105-105.ngrok-free.app";
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -26,6 +27,7 @@
       const res = await fetch(`${API_BASE}/habits/today?user_id=${userId}`);
       const habits = await res.json();
       let completed = 0;
+      
       for (let habit of habits) {
         const compRes = await fetch(`${API_BASE}/habits/${habit.id}/completions?user_id=${userId}`);
         const completions = await compRes.json();
@@ -36,6 +38,20 @@
 
       // Calculate progress percentage
       const percent = habits.length ? (completed / habits.length) * 100 : 0;
+
+      const currentProgressText = document.getElementById("progress-text").textContent.replace("%", "");
+      const currentValue = parseInt(currentProgressText, 10) || 0;
+      animateProgress(currentValue, percent);
+        if (Math.round(percent) === 100) {
+          setTimeout(() => {
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          }, 500); // delay so it pops after animation finishes
+        }
+      document.getElementById("progress-wrapper").classList.add("opacity-100");
 
       // Update progress circle
       document.getElementById("progress-path").setAttribute("stroke-dasharray", `${percent}, 100`);
@@ -256,6 +272,34 @@
         }
       });
     };
+    function animateProgress(from, to, duration = 2600) {
+      const start = performance.now();
+      const path = document.getElementById("progress-path");
+      const text = document.getElementById("progress-text");
+
+      function easing(t) {
+        // Ease out cubic
+        return 1 - Math.pow(1 - t, 3);
+      }
+
+      function update(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easing(progress);
+
+        const current = from + (to - from) * eased;
+
+        path.setAttribute("stroke-dasharray", `${current}, 100`);
+        text.textContent = `${Math.round(current)}%`;
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        }
+      }
+
+      requestAnimationFrame(update);
+    }
+
   </script>
 </head>
 
@@ -269,7 +313,7 @@
         <div class="text-center text-gray-500 text-sm mb-1">
           Today’s Progress
         </div>
-        <div class="flex justify-center">
+        <div class="flex justify-center transition-opacity duration-500 opacity-0" id="progress-wrapper">
           <div class="relative w-28 h-28">
             <svg class="w-full h-full" viewBox="0 0 36 36">
               <path
@@ -401,4 +445,6 @@
   </div>
 </body>
 </html>
+
+
 

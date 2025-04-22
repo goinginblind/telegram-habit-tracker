@@ -114,6 +114,7 @@ def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
             break
     
     return streak
+
 # This thing counts the expected day to get us our STREAKSSS (2 DAYS NO LEETCODE)
 def get_expected_day(date: date, repeat_type: str) -> date:
     if repeat_type == RepeatType.DAILY:
