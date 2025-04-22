@@ -19,8 +19,9 @@ app.add_middleware(
 )
 
 # 2. Include API routes
-app.include_router(habits.router)
 app.include_router(completions.router)
+app.include_router(habits.router)
+
 
 # 3. Create DB tables
 models.Base.metadata.create_all(bind=engine)

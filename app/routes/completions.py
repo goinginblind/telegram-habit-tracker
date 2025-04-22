@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.routes.habits import get_db
 from app import models, schemas
+from app.models import Habit, HabitCompletion
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from typing import List, Optional
+from collections import defaultdict
+import logging
 
 
 router = APIRouter()
@@ -70,3 +73,52 @@ def get_completions_for_habit(user_id: int, habit_id: int, db: Session = Depends
     ).all()
 
     return completions
+
+
+@router.get("/habits/completion_calendar")
+def completion_calendar(user_id: int, db: Session = Depends(get_db)):
+    print(f"[DEBUG] Received raw user_id: {user_id}")
+    # Step 1: Get all tracked habits
+    habits = db.query(Habit).filter(
+        Habit.user_id == user_id,
+        Habit.tracked == True
+    ).all()
+
+    # Step 2: Get all completions for those habits
+    completions = db.query(HabitCompletion).filter(
+        HabitCompletion.user_id == user_id
+    ).all()
+
+    # Step 3: Group completions by date
+    completions_by_day = defaultdict(set)  # date -> set of habit_ids completed
+    for c in completions:
+        completions_by_day[c.completed_at.date()].add(c.habit_id)
+
+    # Step 4: For each date with a completion, count how many habits were expected that day
+    calendar = {}
+
+    for day in completions_by_day:
+        total = 0
+        for habit in habits:
+            if habit.start_date > day:
+                continue
+            if habit.repeat_type == "daily":
+                total += 1
+            elif habit.repeat_type == "weekly" and day.weekday() == habit.start_date.weekday():
+                total += 1
+            elif habit.repeat_type == "biweekly":
+                delta = (day - habit.start_date).days
+                if delta % 14 == 0:
+                    total += 1
+            elif habit.repeat_type == "monthly" and day.day == habit.start_date.day:
+                total += 1
+            elif habit.repeat_type == "custom":
+                total += 1  # Replace with your logic
+
+        calendar[day.isoformat()] = {
+            "completed": len(completions_by_day[day]),
+            "total": total or 1
+        }
+    print(f"[LOG] Heatmap generated for {len(calendar)} days")
+
+    return calendar

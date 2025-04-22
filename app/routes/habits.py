@@ -234,7 +234,7 @@ def get_today_summary(user_id: int, db: Session = Depends(get_db)):
     today_str = date.today().isoformat()
 
     # Step 1: Get all habits for this user that are active today
-    habits = db.query(models.Habit).filter(models.Habit.user_id == user_id).all()
+    habits = db.query(models.Habit).filter(models.Habit.user_id == user_id, models.Habit.tracked == True).all()
     habit_ids = [habit.id for habit in habits]
 
     # Step 2: Get completions for today in one query
