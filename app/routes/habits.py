@@ -101,22 +101,44 @@ def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
 
     if not completions:
         return 0
-    
+
     current_date, streak = datetime.now(timezone.utc).date(), 0
+    completed_today = False
+    last_completed_date = None
 
     for completion in completions:
-        completion_day = completion.completed_at.date() 
+        completion_day = completion.completed_at.date()
 
         if completion_day == current_date:
             streak += 1
-            current_date = get_expected_day(date=completion_day, repeat_type=habit.repeat_type)
+            completed_today = True
+            continue  # Exit early once we see completion for today
         elif completion_day < current_date:
-            break
-    
+            # Adjust target day logic based on repeat_type
+            if habit.repeat_type == "daily":
+                # Reset streak if habit wasn't completed today
+                if (current_date - completion_day).days > 1:
+                    streak = 0
+                    break
+            elif habit.repeat_type == "weekly":
+                # Reset streak if habit wasn't completed on the specific target day of the week
+                if completion_day.weekday() != current_date.weekday():
+                    streak = 0
+                    break
+            # Add logic for other repeat types as needed
+            current_date = get_expected_date(date=completion_day, repeat_type=habit.repeat_type)
+            streak += 1
+            last_completed_date = completion_day
+
+    # Reset streak if habit wasn't completed for the target day
+    if not completed_today and streak == 0:
+        return 0  # Habit wasn't completed on the target day, reset streak
+
     return streak
 
+
 # This thing counts the expected day to get us our STREAKSSS (2 DAYS NO LEETCODE)
-def get_expected_day(date: date, repeat_type: str) -> date:
+def get_expected_date(date: date, repeat_type: str) -> date:
     if repeat_type == RepeatType.DAILY:
         return date - timedelta(days=1)
     elif repeat_type == RepeatType.WEEKLY:
