@@ -245,16 +245,17 @@ def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
 # Gets todays summary to lessen load from the frontend i guess
 @router.get("/habits/today/summary")
 def get_today_summary(user_id: int, db: Session = Depends(get_db)):
-    today_str = date.today().isoformat()
 
     # all habits active today
     habits = get_habits_for_today(user_id=user_id, db=db)
-    habit_ids = [habit.id for habit in habits]
 
-    # Completions for today
+    start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1)
+
     completions_today = db.query(models.HabitCompletion.habit_id).filter(
         models.HabitCompletion.user_id == user_id,
-        models.HabitCompletion.completed_at.startswith(today_str)
+        models.HabitCompletion.completed_at >= start_of_day,
+        models.HabitCompletion.completed_at < end_of_day
     ).all()
     completed_today_ids = {row.habit_id for row in completions_today}
 
