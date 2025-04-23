@@ -10,6 +10,7 @@ from typing import Dict, List
 
 from datetime import date, datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
+from calendar import monthrange
 
 from app.logger import logger
 
@@ -188,12 +189,16 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
                 habits_today.append(habit)
         
         elif habit.repeat_type == "monthly":
-            next_occurrence = habit.start_date
-            while next_occurrence <= today:
-                if next_occurrence == today:
+            start_day = habit.start_date.day
+            last_day_current_month = monthrange(today.year, today.month)[1]
+            # so if a habits start day is the last day of the month (i.e. 31st) and curr month has less days, 
+            # append todays habits with this habit if today is the last day of the month 
+            if start_day >= 28:
+                if today.day == last_day_current_month:
                     habits_today.append(habit)
-                    break
-                next_occurrence += relativedelta(months=1)
+            else:
+                if today.day == start_day:
+                    habits_today.append(habit)
 
         elif habit.repeat_type == "custom":
             pass
@@ -226,7 +231,7 @@ def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Habit not found")
     return habit
 
-# Get ttodays progress
+# Get ttodays progress for da wheel
 @router.get("/progress/today", response_model=Dict[str, float])
 def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
     habits = get_habits_for_today(user_id=user_id, db=db)
