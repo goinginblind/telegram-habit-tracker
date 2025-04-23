@@ -78,7 +78,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_id: userId }),
           });
-          loadHabits(); // refresh
+          loadHabits(); // Refresh for now but NEEDS to be fixed some other way later
         };
 
         container.appendChild(card);

@@ -11,8 +11,11 @@ from typing import Dict, List
 from datetime import date, datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 
+from app.logger import logger
+
 
 router = APIRouter()
+
 
 # Create a new habit
 @router.post("/habits")
@@ -161,8 +164,15 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
         models.Habit.user_id == user_id
     ).all()
 
+    today = datetime.now(timezone.utc).date()
+    habits = db.query(models.Habit).filter(
+        models.Habit.tracked == True,
+        models.Habit.user_id == user_id
+    ).all()
+
     habits_today = []
     for habit in habits:
+        logger.debug(f"Habit {habit.name} — start: {habit.start_date}, today: {today}, repeat_type: {habit.repeat_type}")
         if habit.start_date > today:
             continue
 
@@ -178,9 +188,13 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
                 habits_today.append(habit)
         
         elif habit.repeat_type == "monthly":
-            if habit.start_date.day == today.day:
-                habits_today.append(habit)
-        
+            next_occurrence = habit.start_date
+            while next_occurrence <= today:
+                if next_occurrence == today:
+                    habits_today.append(habit)
+                    break
+                next_occurrence += relativedelta(months=1)
+
         elif habit.repeat_type == "custom":
             pass
     
@@ -213,7 +227,7 @@ def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
     return habit
 
 # Get ttodays progress
-@router.get("progress/today", response_model=Dict[str, float])
+@router.get("/progress/today", response_model=Dict[str, float])
 def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
     habits = get_habits_for_today(user_id=user_id, db=db)
     completions_count = 0
@@ -222,7 +236,7 @@ def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
 
     for habit in habits:
         completions = get_completions_for_habit(user_id=user_id, habit_id=habit.id, db=db)
-        if any(c.completed_at.date == today for c in completions):
+        if any(c.completed_at.date() == today for c in completions):
             completions_count += 1
     
     return {"progress": completions_count / total_count * 100 if total_count > 0 else 0}
@@ -233,18 +247,18 @@ def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
 def get_today_summary(user_id: int, db: Session = Depends(get_db)):
     today_str = date.today().isoformat()
 
-    # Step 1: Get all habits for this user that are active today
-    habits = db.query(models.Habit).filter(models.Habit.user_id == user_id, models.Habit.tracked == True).all()
+    # all habits active today
+    habits = get_habits_for_today(user_id=user_id, db=db)
     habit_ids = [habit.id for habit in habits]
 
-    # Step 2: Get completions for today in one query
+    # Completions for today
     completions_today = db.query(models.HabitCompletion.habit_id).filter(
         models.HabitCompletion.user_id == user_id,
         models.HabitCompletion.completed_at.startswith(today_str)
     ).all()
     completed_today_ids = {row.habit_id for row in completions_today}
 
-    # Step 3: For each habit, compute streak
+    # Habits streaks
     summary = []
     for habit in habits:
         streak = get_streak(user_id, habit.id, db)

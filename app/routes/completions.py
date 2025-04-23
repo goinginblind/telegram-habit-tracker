@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.routes.habits import get_db
+from app.database import get_db
 from app import models, schemas
 from app.models import Habit, HabitCompletion
 
@@ -60,7 +60,12 @@ def toggle_completion(
     if existing:
         db.delete(existing)
         db.commit()
-        return {"id": 0, "habit_id": habit_id, "user_id": user_id, "completed_at": None}
+        return schemas.CompletionRead(
+            id=0, 
+            habit_id=habit_id, 
+            user_id=user_id, 
+            completed_at=None
+        )
     else:
         return create_completion(user_id=user_id, habit_id=habit_id, db=db)
 
