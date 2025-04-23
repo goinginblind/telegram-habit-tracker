@@ -16,7 +16,7 @@ class Habit(Base):
     name        = Column(String, index=True)
     tracked     = Column(Boolean, default=True)
     repeat_type = Column(SQLAlchemyEnum(RepeatType), default=RepeatType.DAILY)
-    start_date   = Column(Date, default=date.today)
+    start_date  = Column(Date, default=date.today)
     type        = Column(SQLAlchemyEnum(HabitType), default=HabitType.BINARY)
     target      = Column(Integer, nullable=True)
 
@@ -29,6 +29,6 @@ class HabitCompletion(Base):
     id           = Column(Integer, primary_key=True, index=True)
     user_id      = Column(Integer, index=True)
     habit_id     = Column(Integer, ForeignKey("habits.id", ondelete="CASCADE"))
-    completed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)) 
+    completed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     habit = relationship("Habit", back_populates="completions")

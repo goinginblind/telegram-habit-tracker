@@ -32,6 +32,7 @@ def create_habit(habit: schemas.HabitCreate, db: Session = Depends(get_db)):
     db.refresh(db_habit)
     return db_habit
 
+
 # Get all of the habits
 @router.get("/habits", response_model=List[schemas.Habit])
 def get_habits(user_id: int, db: Session = Depends(get_db)):
@@ -39,6 +40,7 @@ def get_habits(user_id: int, db: Session = Depends(get_db)):
         models.Habit.user_id == user_id
     ).all()
     return habits
+
 
 # Get tracked habits only
 @router.get("/habits/tracked", response_model=List[schemas.Habit])
@@ -48,6 +50,7 @@ def get_tracked_habits(user_id: int, db: Session = Depends(get_db)):
         models.Habit.user_id == user_id
     ).all()
     return habits
+
 
 # Delete a habit (hard and permanent)
 @router.delete("/habits/{habit_id}", status_code=204)
@@ -63,6 +66,7 @@ def delete_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     db.delete(habit)
     db.commit()
     return
+
 
 # Untrack a habit, so, basically a soft delete
 @router.patch("/habits/{habit_id}/untrack")
@@ -95,6 +99,7 @@ def track_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(habit)
     return
+
 
 # Get habit streak
 @router.get("/habits/{habit_id}/streak")
@@ -205,6 +210,7 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
     
     return habits_today
 
+
 # Edit habits
 @router.put("/habits/{habit_id}")
 def update_habit(habit_id: int, habit_data: HabitUpdate, db: Session = Depends(get_db)):
@@ -223,6 +229,7 @@ def update_habit(habit_id: int, habit_data: HabitUpdate, db: Session = Depends(g
     db.refresh(habit)
     return habit
 
+
 # Get one (user_id specific) habit
 @router.get("/habits/{habit_id}", response_model=schemas.Habit)
 def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
@@ -230,6 +237,7 @@ def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
     if not habit:
         raise HTTPException(status_code=404, detail="Habit not found")
     return habit
+
 
 # Get ttodays progress for da wheel
 @router.get("/progress/today", response_model=Dict[str, float])
