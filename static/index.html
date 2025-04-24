@@ -100,28 +100,33 @@
           `;
 
 
-        card.onclick = async (e) => {
-          if (e.target.tagName === "BUTTON") return;
+          let pressTimer;
+          let isLongPress = false;
 
-          let value = null;
 
-          if (habit.type === "binary") {
-            value = null; // toggle
-          } else if (habit.type === "countable") {
-            value = 1; // increment
-          } else if (habit.type === "limit") {
-            value = 1; // decrement (assume starting from target)
-          }
+          card.addEventListener("pointerdown", (e) => {
+            if (e.target.tagName === "BUTTON") return;
 
-          await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId, value }),
+            didTriggerTap = false;
+
+            pressTimer = setTimeout(() => {
+              didTriggerTap = true; // ← flag that long press already triggered
+
+              handleHabitTap(habit, -1); // undo
+              if (navigator.vibrate) {
+                navigator.vibrate(50);
+              }
+            }, 500);
           });
-          
 
-          loadHabits(); // reload for now
-        };
+          card.addEventListener("pointerup", (e) => {
+            clearTimeout(pressTimer);
+
+            if (e.target.tagName === "BUTTON") return;
+            if (!didTriggerTap) {
+              handleHabitTap(habit, 1); // short tap
+            }
+          });
 
 
         container.appendChild(card);
@@ -131,6 +136,25 @@
         container.classList.remove("opacity-0");
         container.classList.add("opacity-100");
       }, 10);
+    }
+    async function handleHabitTap(habit, direction) {
+      let value = null;
+
+      if (habit.type === "binary") {
+        value = null; // toggle
+      } else if (habit.type === "countable") {
+        value = direction; // 1 = increment, -1 = undo
+      } else if (habit.type === "limit") {
+        value = direction; // 1 = closer to limit, -1 = undo
+      }
+
+      await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, value }),
+      });
+
+      loadHabits();
     }
 
 

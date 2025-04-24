@@ -36,69 +36,74 @@ def toggle_completion(
     completion: schemas.CompletionCreate,
     db: Session = Depends(get_db),
 ):
-    user_id = completion.user_id   # ← pull it from the body
+    user_id = completion.user_id
 
-    habit = (
-        db.query(models.Habit)
-          .filter(models.Habit.id == habit_id,
-                  models.Habit.user_id == user_id)
-          .first()
-    )
+    habit = db.query(models.Habit).filter(
+        models.Habit.id == habit_id,
+        models.Habit.user_id == user_id
+    ).first()
+
     if habit is None:
         raise HTTPException(404, "Habit not found")
+
+    today = datetime.now(timezone.utc).date()
+
     if habit.type == "binary":
-        today = datetime.now(timezone.utc).date()
-        existing = (
-        db.query(models.HabitCompletion)
-            .filter(
+        existing = db.query(models.HabitCompletion).filter(
             models.HabitCompletion.habit_id == habit_id,
             models.HabitCompletion.user_id == user_id,
             func.date(models.HabitCompletion.completed_at) == today
-            ).first()
-        )
+        ).first()
+
         if existing:
             db.delete(existing)
             db.commit()
             return schemas.CompletionRead(
-                id=0, 
-                habit_id=habit_id, 
-                user_id=user_id, 
+                id=0,
+                habit_id=habit_id,
+                user_id=user_id,
                 completed_at=None
             )
         else:
             return create_completion(user_id=user_id, habit_id=habit_id, db=db)
-    else:
-        if completion.value is None:
-            raise HTTPException(400, "Completion value is required for countable/limit habits")
 
-        today = datetime.now(timezone.utc).date()
-        existing = (
-            db.query(models.HabitCompletion)
-            .filter(
-                models.HabitCompletion.habit_id == habit_id,
-                models.HabitCompletion.user_id == user_id,
-                func.date(models.HabitCompletion.completed_at) == today
-            ).first()
+    # countable / limit
+    if completion.value is None:
+        raise HTTPException(400, "Completion value is required for countable/limit habits")
+
+    existing = db.query(models.HabitCompletion).filter(
+        models.HabitCompletion.habit_id == habit_id,
+        models.HabitCompletion.user_id == user_id,
+        func.date(models.HabitCompletion.completed_at) == today
+    ).first()
+
+    if existing:
+        new_value = (existing.value or 0) + completion.value
+        if habit.type in ["limit", "countable"]:
+            new_value = max(0, new_value)
+
+        existing.value = new_value
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        if habit.type in ["limit", "countable"] and completion.value < 0:
+            return schemas.CompletionRead(
+                id=0,
+                habit_id=habit_id,
+                user_id=user_id,
+                completed_at=None
+            )
+
+        return create_completion(
+            user_id=user_id,
+            habit_id=habit_id,
+            db=db,
+            completed_at=completion.completed_at,
+            value=completion.value  # no clamping here — backend update already clamps existing.value + delta
         )
 
-        if existing:
-            new_value = (existing.value or 0) + completion.value
 
-            if habit.type == "limit":
-                new_value = max(0, new_value)  # prevent negative values
-
-            existing.value = new_value
-            db.commit()
-            db.refresh(existing)
-            return existing  # You could wrap with CompletionRead if strict schema
-        else:
-            return create_completion(
-                user_id=user_id,
-                habit_id=habit_id,
-                db=db,
-                completed_at=completion.completed_at,
-                value=max(0, completion.value) if habit.type == "limit" else completion.value
-            )
 
 
 @router.get("/habits/{habit_id}/completions", response_model=List[schemas.CompletionRead])
