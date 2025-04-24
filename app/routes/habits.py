@@ -36,7 +36,7 @@ def create_habit(habit: schemas.HabitCreate, db: Session = Depends(get_db)):
     return db_habit
 
 
-# Get all of the habits
+# Get all the habits
 @router.get("/habits", response_model=List[schemas.Habit])
 def get_habits(user_id: int, db: Session = Depends(get_db)):
     habits = db.query(models.Habit).filter(
@@ -71,7 +71,7 @@ def delete_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     return
 
 
-# Untrack a habit, so, basically a soft delete
+# Untrack a habit, so, a soft delete (won't showup in todays page, tough still exists)
 @router.patch("/habits/{habit_id}/untrack")
 def untrack_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(
@@ -86,6 +86,7 @@ def untrack_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(habit)
     return
+
 
 # Track a habit, bring back from the soft delete
 @router.patch("/habits/{habit_id}/track")
@@ -104,6 +105,7 @@ def track_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     return
 
 
+# well, a streak-getter...
 @router.get("/habits/{habit_id}/streak")
 def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     habit = get_habit(habit_id=habit_id, user_id=user_id, db=db)
@@ -120,17 +122,17 @@ def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
 
     for date in completed_days:
         if habit.type in ("countable", "limit"):
-            # Sum up completions for that day
+            # completion on this day summed up
             day_completions = [c for c in completions if c.completed_at.date() == date]
             total_value = sum(c.value or 0 for c in day_completions)
 
             if habit.type == "countable":
                 if total_value < (habit.target or 1):
-                    break  # not a completed day
+                    break # days not completed
             elif habit.type == "limit":
                 if total_value >= (habit.target or 0):
                     break
-        # Binary or passed checks
+        # binary 
         if date == current_date:
             streak += 1
         else:
@@ -141,7 +143,6 @@ def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
             current_date = expected
 
     return streak
-
 
 
 # This thing counts the expected day to get us our STREAKSSS (2 DAYS NO LEETCODE)
@@ -194,8 +195,8 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
         elif habit.repeat_type == "monthly":
             start_day = habit.start_date.day
             last_day_current_month = monthrange(today.year, today.month)[1]
-            # so if a habits start day is the last day of the month (i.e. 31st) and curr month has less days, 
-            # append todays habits with this habit if today is the last day of the month 
+            # i.e. today is april 30th, 2025, but the habits start day is march 31st 2025
+            # in order to nt skip it, we'll just append todays habits with this *almost* missed out habit
             if start_day >= 28:
                 if today.day == last_day_current_month:
                     habits_today.append(habit)
@@ -209,7 +210,7 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
     return habits_today
 
 
-# Edit habits
+# to allow editing of habits
 @router.put("/habits/{habit_id}")
 def update_habit(habit_id: int, habit_data: HabitUpdate, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(
@@ -237,7 +238,7 @@ def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
     return habit
 
 
-# Get ttodays progress for da wheel
+# Get ttodays progress (for da frontend wheel mostly)
 @router.get("/progress/today", response_model=Dict[str, float])
 def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
     habits = get_habits_for_today(user_id=user_id, db=db)
@@ -254,6 +255,7 @@ def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
 
 
 # Gets todays summary to lessen load from the frontend i guess
+# and make it... *snappy*-ish... -er, whatever...
 @router.get("/habits/today/summary")
 def get_today_summary(user_id: int, db: Session = Depends(get_db)):
     habits = get_habits_for_today(user_id=user_id, db=db)
@@ -262,7 +264,7 @@ def get_today_summary(user_id: int, db: Session = Depends(get_db)):
 
     summary = []
 
-    for habit in habits:
+    for habit in habits:  # some of the habits didn't work properly since utc and local time was diff
         completions = db.query(models.HabitCompletion).filter(
             models.HabitCompletion.habit_id == habit.id,
             models.HabitCompletion.user_id == user_id,
@@ -290,7 +292,7 @@ def get_today_summary(user_id: int, db: Session = Depends(get_db)):
             "id": habit.id,
             "name": habit.name,
             "repeat_type": habit.repeat_type,
-            "type": habit.type,  # so frontend knows how to behave
+            "type": habit.type,
             "current_value": total_value,
             "target": habit.target,
             "completed_today": completed_today,

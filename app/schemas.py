@@ -9,7 +9,7 @@ class RepeatType(str, Enum):
     WEEKLY = "weekly"
     BIWEEKLY = "biweekly"
     MONTHLY = "monthly"
-    CUSTOM = "custom"  
+    CUSTOM = "custom"  # Not yet supported but l8r (in a week) will allow custom weekdays  
 
 
 class HabitType(str, Enum):
@@ -64,7 +64,7 @@ class CompletionBase(BaseModel):
     value: Optional[int] = None
 
 
-class CompletionCreate(CompletionBase):
+class CompletionCreate(CompletionBase):  # simply inherist from base so that's why its empty
     pass
 
 

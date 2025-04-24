@@ -48,6 +48,7 @@ def toggle_completion(
 
     today = datetime.now(timezone.utc).date()
 
+    # for binary it literally is toggle (upon toggling it either adds or deletes completion)
     if habit.type == "binary":
         existing = db.query(models.HabitCompletion).filter(
             models.HabitCompletion.habit_id == habit_id,
@@ -67,7 +68,7 @@ def toggle_completion(
         else:
             return create_completion(user_id=user_id, habit_id=habit_id, db=db)
 
-    # countable / limit
+    # countable / limit types 
     if completion.value is None:
         raise HTTPException(400, "Completion value is required for countable/limit habits")
 
@@ -92,7 +93,7 @@ def toggle_completion(
                 id=0,
                 habit_id=habit_id,
                 user_id=user_id,
-                completed_at=None
+                completed_at=None  # notice the dummy return (and its not even me)
             )
 
         return create_completion(
@@ -100,10 +101,8 @@ def toggle_completion(
             habit_id=habit_id,
             db=db,
             completed_at=completion.completed_at,
-            value=completion.value  # no clamping here — backend update already clamps existing.value + delta
+            value=completion.value
         )
-
-
 
 
 @router.get("/habits/{habit_id}/completions", response_model=List[schemas.CompletionRead])
@@ -116,26 +115,25 @@ def get_completions_for_habit(user_id: int, habit_id: int, db: Session = Depends
     return completions
 
 
-@router.get("/habits/completion_calendar")
+# This WILL be used for a heatmap, but is not used now
+@router.get("/habits/completion_calendar") 
 def completion_calendar(user_id: int, db: Session = Depends(get_db)):
     print(f"[DEBUG] Received raw user_id: {user_id}")
-    # Step 1: Get all tracked habits
     habits = db.query(Habit).filter(
         Habit.user_id == user_id,
         Habit.tracked == True
     ).all()
 
-    # Step 2: Get all completions for those habits
     completions = db.query(HabitCompletion).filter(
         HabitCompletion.user_id == user_id
     ).all()
 
-    # Step 3: Group completions by date
+    # completions are grouped by date
     completions_by_day = defaultdict(set)  # date -> set of habit_ids completed
     for c in completions:
         completions_by_day[c.completed_at.date()].add(c.habit_id)
 
-    # Step 4: For each date with a completion, count how many habits were expected that day
+    # compare set of completions for that day vs EXPECTED (so the thats where the 'heat' part comes from)
     calendar = {}
 
     for day in completions_by_day:
@@ -154,12 +152,12 @@ def completion_calendar(user_id: int, db: Session = Depends(get_db)):
             elif habit.repeat_type == "monthly" and day.day == habit.start_date.day:
                 total += 1
             elif habit.repeat_type == "custom":
-                total += 1  # Replace with your logic
+                total += 1  # a 'pass' is better? (is it?)
 
         calendar[day.isoformat()] = {
             "completed": len(completions_by_day[day]),
             "total": total or 1
         }
-    print(f"[LOG] Heatmap generated for {len(calendar)} days")
+    print(f"[LOG] heatmap for {len(calendar)} days")
 
     return calendar
