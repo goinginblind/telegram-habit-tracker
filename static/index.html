@@ -59,27 +59,70 @@
           habit.completed_today ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
         }`;
 
-        card.innerHTML = `
-          <div class="flex justify-between items-center">
-            <div class="flex-1 cursor-pointer">
-              <h2 class="text-lg font-semibold">${habit.name}</h2>
-              <p class="text-sm text-gray-500">
-                ${habit.repeat_type} • 🔥 ${habit.streak} day streak
-              </p>
+        let progressBar = "";
+          if (habit.type === "countable" || habit.type === "limit") {
+            // You’ll need to expose `current_value` and `target` from backend too if not already
+            const current = habit.current_value || 0;
+            const target = habit.target || 1;
+            const percent = Math.min(100, (current / target) * 100);
+            const barColor = (habit.type === "limit" && !habit.completed_today) ? "bg-red-500" : "bg-green-500";
+
+            progressBar = `
+              <div class="mt-2 bg-gray-200 rounded h-2">
+                <div class="${barColor} h-2 rounded" style="width: ${percent}%;"></div>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">${current} / ${target}</p>
+            `;
+          }
+          let cardClass = "rounded-xl shadow-md p-4 mb-4 transition border ";
+
+          if (habit.type === "limit" && !habit.completed_today) {
+            cardClass += "bg-red-100 border-red-300";
+          } else if (habit.completed_today) {
+            cardClass += "bg-green-100 border-green-300";
+          } else {
+            cardClass += "bg-white border-gray-200";
+          }
+
+          card.className = cardClass;
+
+          card.innerHTML = `
+            <div class="flex justify-between items-center">
+              <div class="flex-1 cursor-pointer">
+                <h2 class="text-lg font-semibold">${habit.name}</h2>
+                <p class="text-sm text-gray-500">
+                  ${habit.repeat_type} • 🔥 ${habit.streak} day streak
+                </p>
+                ${progressBar}
+              </div>
+              <button class="text-gray-500 hover:text-black px-2" onclick="editHabit(${habit.id})">⋮</button>
             </div>
-            <button class="text-gray-500 hover:text-black px-2" onclick="editHabit(${habit.id})">⋮</button>
-          </div>
-        `;
+          `;
+
 
         card.onclick = async (e) => {
           if (e.target.tagName === "BUTTON") return;
+
+          let value = null;
+
+          if (habit.type === "binary") {
+            value = null; // toggle
+          } else if (habit.type === "countable") {
+            value = 1; // increment
+          } else if (habit.type === "limit") {
+            value = 1; // decrement (assume starting from target)
+          }
+
           await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: userId }),
+            body: JSON.stringify({ user_id: userId, value }),
           });
-          loadHabits(); // Refresh for now but NEEDS to be fixed some other way later
+          
+
+          loadHabits(); // reload for now
         };
+
 
         container.appendChild(card);
       }
@@ -173,16 +216,20 @@
       const repeatType = document.getElementById("repeat-type").value;
       const tracked = document.getElementById("tracked").checked;
       const startDate = document.getElementById("start-date").value;
+      const type = document.getElementById("habit-type").value;
+      const targetRaw = document.getElementById("habit-target").value;
+      const target = targetRaw ? parseInt(targetRaw, 10) : null;
 
       if (!name.trim()) return;
 
       await fetch(`${API_BASE}/habits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, repeat_type: repeatType, tracked, user_id: userId, start_date: startDate }),
+        body: JSON.stringify({ name, repeat_type: repeatType, tracked, user_id: userId, start_date: startDate, type, target }),
       });
 
-      document.getElementById("habit-form").reset();
+      document.getElementById("habit-form").reset();  
+      document.getElementById("habit-target").classList.add("hidden");
       closeAddHabitModal();
       loadHabits();
     }
@@ -213,6 +260,9 @@
       const repeat_type = document.getElementById("edit-repeat-type").value;
       const start_date = document.getElementById("edit-start-date").value;
       const tracked = document.getElementById("edit-tracked").checked;
+      const type = document.getElementById("edit-habit-type").value;
+      const targetRaw = document.getElementById("edit-habit-target").value;
+      const target = targetRaw ? parseInt(targetRaw, 10) : null;
 
       await fetch(`${API_BASE}/habits/${id}`, {
         method: "PUT",
@@ -224,6 +274,8 @@
           repeat_type,
           start_date,
           tracked,
+          type,
+          target,
         }),
       });
 
@@ -234,6 +286,26 @@
 
     window.onload = () => {
       showPage("today");
+      document.getElementById("habit-type").addEventListener("change", () => {
+        const type = document.getElementById("habit-type").value;
+        const targetInput = document.getElementById("habit-target");
+        if (type === "countable" || type === "limit") {
+          targetInput.classList.remove("hidden");
+        } else {
+          targetInput.classList.add("hidden");
+        }
+      });
+
+      document.getElementById("edit-habit-type").addEventListener("change", () => {
+        const type = document.getElementById("edit-habit-type").value;
+        const targetInput = document.getElementById("edit-habit-target");
+
+        if (type === "countable" || type === "limit") {
+          targetInput.classList.remove("hidden");
+        } else {
+          targetInput.classList.add("hidden");
+        }
+      });
 
       document.getElementById("delete-habit-button").addEventListener("click", async () => {
         const id = parseInt(document.getElementById("edit-habit-id").value, 10);
@@ -249,7 +321,10 @@
           if (!response.ok) {
             throw new Error("Failed to delete habit.");
           }
-
+          
+          document.getElementById("edit-habit-type").value = habit.type;
+          document.getElementById("edit-habit-target").value = habit.target ?? "";
+          document.getElementById("edit-habit-type").dispatchEvent(new Event("change"));
           closeEditHabitModal();
           loadHabits();
           loadAllHabits();
@@ -370,6 +445,18 @@
           <option value="monthly">Monthly</option>
           <option value="custom">Custom</option>
         </select>
+        <select id="edit-habit-type" class="border p-2 rounded w-full mb-2">
+          <option value="binary">Binary</option>
+          <option value="countable">Countable</option>
+          <option value="limit">Limit</option>
+        </select>
+        
+        <input
+          type="number"
+          id="edit-habit-target"
+          class="w-full border p-2 rounded mb-2 hidden"
+          placeholder="Target value"
+        />
         <input type="date" id="edit-start-date" class="w-full border p-2 rounded mb-2" />
         <label class="text-sm flex items-center gap-1 mb-2">
           <input type="checkbox" id="edit-tracked" /> Tracked
@@ -419,6 +506,12 @@
           <option value="monthly">Monthly</option>
           <option value="custom">Custom</option>
         </select>
+        <select id="habit-type" class="border p-2 rounded w-full mb-2">
+          <option value="binary">Binary</option>
+          <option value="countable">Countable</option>
+          <option value="limit">Limit</option>
+        </select>
+        <input type="number" id="habit-target" class="w-full border p-2 rounded mb-2 hidden" placeholder="Target value"/>
         <input type="date" id="start-date" class="w-full border p-2 rounded mb-2" />
         <label class="text-sm flex items-center gap-1 mb-2">
           <input type="checkbox" id="tracked" checked /> Tracked

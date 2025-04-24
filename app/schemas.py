@@ -24,7 +24,8 @@ class HabitCreate(BaseModel):
     start_date: Optional[date] = None
     tracked: bool = True
     user_id: int
-    type: HabitType = HabitType.BINARY
+    type: HabitType
+    target: Optional[int] = None
 
 
 class Habit(BaseModel):
@@ -48,6 +49,8 @@ class HabitUpdate(BaseModel):
     repeat_type: Optional[str]
     start_date: Optional[date]
     tracked: Optional[bool]
+    target: Optional[int]
+    type: Optional[HabitType]
 
     
     model_config = {
@@ -58,6 +61,7 @@ class HabitUpdate(BaseModel):
 class CompletionBase(BaseModel):
     user_id: int
     completed_at: Optional[datetime] = None
+    value: Optional[int] = None
 
 
 class CompletionCreate(CompletionBase):

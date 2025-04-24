@@ -22,10 +22,13 @@ router = APIRouter()
 @router.post("/habits")
 def create_habit(habit: schemas.HabitCreate, db: Session = Depends(get_db)):
     db_habit = models.Habit(
-        name=habit.name, 
-        repeat_type=habit.repeat_type, 
+        name=habit.name,
+        repeat_type=habit.repeat_type,
         tracked=habit.tracked,
-        user_id=habit.user_id
+        user_id=habit.user_id,
+        type=habit.type,
+        target=habit.target,
+        start_date=habit.start_date or date.today()
     )
     db.add(db_habit)
     db.commit()
@@ -101,49 +104,44 @@ def track_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     return
 
 
-# Get habit streak
 @router.get("/habits/{habit_id}/streak")
 def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     habit = get_habit(habit_id=habit_id, user_id=user_id, db=db)
     completions = get_completions_for_habit(user_id=user_id, habit_id=habit_id, db=db)
-    completions = sorted(completions, key=lambda c: c.completed_at, reverse=True)
 
     if not completions:
         return 0
 
-    current_date, streak = datetime.now(timezone.utc).date(), 0
-    completed_today = False
-    last_completed_date = None
+    # Extract dates where habit was completed
+    completed_days = sorted({c.completed_at.date() for c in completions}, reverse=True)
 
-    for completion in completions:
-        completion_day = completion.completed_at.date()
+    current_date = datetime.now(timezone.utc).date()
+    streak = 0
 
-        if completion_day == current_date:
-            streak += 1
-            completed_today = True
-            continue  # Exit early once we see completion for today
-        elif completion_day < current_date:
-            # Adjust target day logic based on repeat_type
-            if habit.repeat_type == "daily":
-                # Reset streak if habit wasn't completed today
-                if (current_date - completion_day).days > 1:
-                    streak = 0
+    for date in completed_days:
+        if habit.type in ("countable", "limit"):
+            # Sum up completions for that day
+            day_completions = [c for c in completions if c.completed_at.date() == date]
+            total_value = sum(c.value or 0 for c in day_completions)
+
+            if habit.type == "countable":
+                if total_value < (habit.target or 1):
+                    break  # not a completed day
+            elif habit.type == "limit":
+                if total_value >= (habit.target or 0):
                     break
-            elif habit.repeat_type == "weekly":
-                # Reset streak if habit wasn't completed on the specific target day of the week
-                if completion_day.weekday() != current_date.weekday():
-                    streak = 0
-                    break
-            # Add logic for other repeat types as needed
-            current_date = get_expected_date(date=completion_day, repeat_type=habit.repeat_type)
+        # Binary or passed checks
+        if date == current_date:
             streak += 1
-            last_completed_date = completion_day
-
-    # Reset streak if habit wasn't completed for the target day
-    if not completed_today and streak == 0:
-        return 0  # Habit wasn't completed on the target day, reset streak
+        else:
+            expected = get_expected_date(date=current_date, repeat_type=habit.repeat_type)
+            if date != expected:
+                break
+            streak += 1
+            current_date = expected
 
     return streak
+
 
 
 # This thing counts the expected day to get us our STREAKSSS (2 DAYS NO LEETCODE)
@@ -258,29 +256,44 @@ def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
 # Gets todays summary to lessen load from the frontend i guess
 @router.get("/habits/today/summary")
 def get_today_summary(user_id: int, db: Session = Depends(get_db)):
-
-    # all habits active today
     habits = get_habits_for_today(user_id=user_id, db=db)
-
     start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = start_of_day + timedelta(days=1)
 
-    completions_today = db.query(models.HabitCompletion.habit_id).filter(
-        models.HabitCompletion.user_id == user_id,
-        models.HabitCompletion.completed_at >= start_of_day,
-        models.HabitCompletion.completed_at < end_of_day
-    ).all()
-    completed_today_ids = {row.habit_id for row in completions_today}
-
-    # Habits streaks
     summary = []
+
     for habit in habits:
+        completions = db.query(models.HabitCompletion).filter(
+            models.HabitCompletion.habit_id == habit.id,
+            models.HabitCompletion.user_id == user_id,
+            models.HabitCompletion.completed_at >= start_of_day,
+            models.HabitCompletion.completed_at < end_of_day
+        ).all()
+
+        completed_today = False
+
+        if habit.type == "binary":
+            total_value = 1
+            completed_today = bool(completions)
+
+        elif habit.type == "countable":
+            total_value = sum(c.value or 0 for c in completions)
+            completed_today = total_value >= (habit.target or 1)
+
+        elif habit.type == "limit":
+            total_value = sum(c.value or 0 for c in completions)
+            completed_today = total_value < (habit.target or 0)
+
         streak = get_streak(user_id, habit.id, db)
+
         summary.append({
             "id": habit.id,
             "name": habit.name,
             "repeat_type": habit.repeat_type,
-            "completed_today": habit.id in completed_today_ids,
+            "type": habit.type,  # so frontend knows how to behave
+            "current_value": total_value,
+            "target": habit.target,
+            "completed_today": completed_today,
             "streak": streak,
         })
 

@@ -16,11 +16,12 @@ import logging
 
 router = APIRouter()
 
-def create_completion(user_id: int, habit_id: int, db: Session, completed_at: Optional[datetime] = None):
+def create_completion(user_id: int, habit_id: int, db: Session, completed_at: Optional[datetime] = None, value: Optional[int] = None):
     new_completion = models.HabitCompletion(
         habit_id=habit_id,
         completed_at=completed_at,
-        user_id=user_id
+        user_id=user_id,
+        value=value
     )
 
     db.add(new_completion)
@@ -28,7 +29,7 @@ def create_completion(user_id: int, habit_id: int, db: Session, completed_at: Op
     db.refresh(new_completion)
     return new_completion
 
-# For binary habits, allow check uncheck and db has 'completed' as the last time user checked it off
+
 @router.post("/habits/{habit_id}/complete", response_model=schemas.CompletionRead)
 def toggle_completion(
     habit_id: int,
@@ -45,29 +46,59 @@ def toggle_completion(
     )
     if habit is None:
         raise HTTPException(404, "Habit not found")
-    if habit.type != "binary":
-        raise HTTPException(400, "Toggle only supported for binary habits")
-
-    today = datetime.now(timezone.utc).date()
-    existing = (
-      db.query(models.HabitCompletion)
-        .filter(
-          models.HabitCompletion.habit_id == habit_id,
-          models.HabitCompletion.user_id == user_id,
-          func.date(models.HabitCompletion.completed_at) == today
-        ).first()
-    )
-    if existing:
-        db.delete(existing)
-        db.commit()
-        return schemas.CompletionRead(
-            id=0, 
-            habit_id=habit_id, 
-            user_id=user_id, 
-            completed_at=None
+    if habit.type == "binary":
+        today = datetime.now(timezone.utc).date()
+        existing = (
+        db.query(models.HabitCompletion)
+            .filter(
+            models.HabitCompletion.habit_id == habit_id,
+            models.HabitCompletion.user_id == user_id,
+            func.date(models.HabitCompletion.completed_at) == today
+            ).first()
         )
+        if existing:
+            db.delete(existing)
+            db.commit()
+            return schemas.CompletionRead(
+                id=0, 
+                habit_id=habit_id, 
+                user_id=user_id, 
+                completed_at=None
+            )
+        else:
+            return create_completion(user_id=user_id, habit_id=habit_id, db=db)
     else:
-        return create_completion(user_id=user_id, habit_id=habit_id, db=db)
+        if completion.value is None:
+            raise HTTPException(400, "Completion value is required for countable/limit habits")
+
+        today = datetime.now(timezone.utc).date()
+        existing = (
+            db.query(models.HabitCompletion)
+            .filter(
+                models.HabitCompletion.habit_id == habit_id,
+                models.HabitCompletion.user_id == user_id,
+                func.date(models.HabitCompletion.completed_at) == today
+            ).first()
+        )
+
+        if existing:
+            new_value = (existing.value or 0) + completion.value
+
+            if habit.type == "limit":
+                new_value = max(0, new_value)  # prevent negative values
+
+            existing.value = new_value
+            db.commit()
+            db.refresh(existing)
+            return existing  # You could wrap with CompletionRead if strict schema
+        else:
+            return create_completion(
+                user_id=user_id,
+                habit_id=habit_id,
+                db=db,
+                completed_at=completion.completed_at,
+                value=max(0, completion.value) if habit.type == "limit" else completion.value
+            )
 
 
 @router.get("/habits/{habit_id}/completions", response_model=List[schemas.CompletionRead])
