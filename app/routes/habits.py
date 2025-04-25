@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 # Create a new habit
-@router.post("/habits")
+@router.post("/api/habits")
 def create_habit(habit: schemas.HabitCreate, db: Session = Depends(get_db)):
     db_habit = models.Habit(
         name=habit.name,
@@ -37,7 +37,7 @@ def create_habit(habit: schemas.HabitCreate, db: Session = Depends(get_db)):
 
 
 # Get all the habits
-@router.get("/habits", response_model=List[schemas.Habit])
+@router.get("/api/habits", response_model=List[schemas.Habit])
 def get_habits(user_id: int, db: Session = Depends(get_db)):
     habits = db.query(models.Habit).filter(
         models.Habit.user_id == user_id
@@ -46,7 +46,7 @@ def get_habits(user_id: int, db: Session = Depends(get_db)):
 
 
 # Get tracked habits only
-@router.get("/habits/tracked", response_model=List[schemas.Habit])
+@router.get("/api/habits/tracked", response_model=List[schemas.Habit])
 def get_tracked_habits(user_id: int, db: Session = Depends(get_db)):
     habits = db.query(models.Habit).filter(
         models.Habit.tracked == True, 
@@ -56,7 +56,7 @@ def get_tracked_habits(user_id: int, db: Session = Depends(get_db)):
 
 
 # Delete a habit (hard and permanent)
-@router.delete("/habits/{habit_id}", status_code=204)
+@router.delete("/api/habits/{habit_id}", status_code=204)
 def delete_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(
         models.Habit.id == habit_id, 
@@ -72,7 +72,7 @@ def delete_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
 
 
 # Untrack a habit, so, a soft delete (won't showup in todays page, tough still exists)
-@router.patch("/habits/{habit_id}/untrack")
+@router.patch("/api/habits/{habit_id}/untrack")
 def untrack_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(
         models.Habit.id == habit_id, 
@@ -89,7 +89,7 @@ def untrack_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
 
 
 # Track a habit, bring back from the soft delete
-@router.patch("/habits/{habit_id}/track")
+@router.patch("/api/habits/{habit_id}/track")
 def track_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(
         models.Habit.id == habit_id, 
@@ -106,7 +106,7 @@ def track_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
 
 
 # well, a streak-getter...
-@router.get("/habits/{habit_id}/streak")
+@router.get("/api/habits/{habit_id}/streak")
 def get_streak(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     habit = get_habit(habit_id=habit_id, user_id=user_id, db=db)
     completions = get_completions_for_habit(user_id=user_id, habit_id=habit_id, db=db)
@@ -160,7 +160,7 @@ def get_expected_date(date: date, repeat_type: str) -> date:
 
 
 # Gets todays habits
-@router.get("/habits/today", response_model=List[schemas.Habit])
+@router.get("/api/habits/today", response_model=List[schemas.Habit])
 def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
     today = datetime.now(timezone.utc).date()
 
@@ -211,7 +211,7 @@ def get_habits_for_today(user_id: int, db: Session = Depends(get_db)):
 
 
 # to allow editing of habits
-@router.put("/habits/{habit_id}")
+@router.put("/api/habits/{habit_id}")
 def update_habit(habit_id: int, habit_data: HabitUpdate, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter(
         models.Habit.user_id == habit_data.user_id,
@@ -230,7 +230,7 @@ def update_habit(habit_id: int, habit_data: HabitUpdate, db: Session = Depends(g
 
 
 # Get one (user_id specific) habit
-@router.get("/habits/{habit_id}", response_model=schemas.Habit)
+@router.get("/api/habits/{habit_id}", response_model=schemas.Habit)
 def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
     habit = db.query(models.Habit).filter_by(id=habit_id, user_id=user_id).first()
     if not habit:
@@ -239,7 +239,7 @@ def get_habit(habit_id: int, user_id: int, db: Session = Depends(get_db)):
 
 
 # Get ttodays progress (for da frontend wheel mostly)
-@router.get("/progress/today", response_model=Dict[str, float])
+@router.get("/api/progress/today", response_model=Dict[str, float])
 def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
     habits = get_habits_for_today(user_id=user_id, db=db)
     completions_count = 0
@@ -256,7 +256,7 @@ def get_todays_progress(user_id: int, db: Session = Depends(get_db)):
 
 # Gets todays summary to lessen load from the frontend i guess
 # and make it... *snappy*-ish... -er, whatever...
-@router.get("/habits/today/summary")
+@router.get("/api/habits/today/summary")
 def get_today_summary(user_id: int, db: Session = Depends(get_db)):
     habits = get_habits_for_today(user_id=user_id, db=db)
     start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)

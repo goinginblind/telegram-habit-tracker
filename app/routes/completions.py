@@ -30,7 +30,7 @@ def create_completion(user_id: int, habit_id: int, db: Session, completed_at: Op
     return new_completion
 
 
-@router.post("/habits/{habit_id}/complete", response_model=schemas.CompletionRead)
+@router.post("/api/habits/{habit_id}/complete", response_model=schemas.CompletionRead)
 def toggle_completion(
     habit_id: int,
     completion: schemas.CompletionCreate,
@@ -105,7 +105,7 @@ def toggle_completion(
         )
 
 
-@router.get("/habits/{habit_id}/completions", response_model=List[schemas.CompletionRead])
+@router.get("/api/habits/{habit_id}/completions", response_model=List[schemas.CompletionRead])
 def get_completions_for_habit(user_id: int, habit_id: int, db: Session = Depends(get_db)):
     completions = db.query(models.HabitCompletion).filter(
         models.HabitCompletion.habit_id == habit_id, 

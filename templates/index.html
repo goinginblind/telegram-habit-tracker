@@ -9,7 +9,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script>
-    const API_BASE = "https://6db2-45-85-105-105.ngrok-free.app";
+    const API_BASE = "{{ API_BASE }}";
+    console.log("Using API_BASE:", API_BASE);
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
     const userId = user?.id;
 
