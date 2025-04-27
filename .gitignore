@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# SQLite database
+*.db
+
+# VS Code settings
+.vscode/
+
+# Mypy, coverage, test output
+.mypy_cache/
+.coverage
+htmlcov/
+pytest_cache/
+
+# macOS files
+.DS_Store
+
+# Misc
+indexRU.html
+bot.py
+
+# Debug logs
+*.log

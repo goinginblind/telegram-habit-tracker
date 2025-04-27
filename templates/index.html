@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Habit Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script>
+    const API_BASE = "{{ API_BASE }}";
+    console.log("Using API_BASE:", API_BASE);
+    const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    const userId = user?.id;
+
+    if (!userId) {
+      alert("Could not detect your Telegram user ID. Please open this app via Telegram.");
+    }
+
+    async function loadHabits() {
+      const container = document.getElementById("today-habit-list");
+
+      container.classList.remove("opacity-100");
+      container.classList.add("opacity-0");
+
+      const res = await fetch(`${API_BASE}/habits/today/summary?user_id=${userId}`);
+      const habits = await res.json();
+
+      let completed = 0;
+      for (let habit of habits) {
+        if (habit.completed_today) completed++;
+      }
+
+      const percent = habits.length ? (completed / habits.length) * 100 : 0;
+      const currentProgressText = document.getElementById("progress-text").textContent.replace("%", "");
+      const currentValue = parseInt(currentProgressText, 10) || 0;
+      animateProgress(currentValue, percent);
+
+      if (Math.round(percent) === 100) {
+        setTimeout(() => {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }, 500);
+      }
+
+      document.getElementById("progress-wrapper").classList.add("opacity-100");
+
+      document.getElementById("progress-path").setAttribute("stroke-dasharray", `${percent}, 100`);
+      document.getElementById("progress-text").textContent = `${Math.round(percent)}%`;
+
+      container.innerHTML = "";
+
+      for (let habit of habits) {
+        const card = document.createElement("div");
+        card.className = `rounded-xl shadow-md p-4 mb-4 transition border ${
+          habit.completed_today ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
+        }`;
+
+        let progressBar = "";
+        if (habit.type === "countable" || habit.type === "limit") {
+          const current = habit.current_value || 0;
+          const target = habit.target || 1;
+          const percent = Math.min(100, (current / target) * 100);
+          const barColor = (habit.type === "limit" && !habit.completed_today) ? "bg-red-500" : "bg-green-500";
+
+          progressBar = `
+            <div class="mt-2 bg-gray-200 rounded h-2">
+              <div class="${barColor} h-2 rounded" style="width: ${percent}%;"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">${current} / ${target}</p>
+          `;
+        }
+        let cardClass = "rounded-xl shadow-md p-4 mb-4 transition border ";
+
+        if (habit.type === "limit" && !habit.completed_today) {
+          cardClass += "bg-red-100 border-red-300";
+        } else if (habit.completed_today) {
+          cardClass += "bg-green-100 border-green-300";
+        } else {
+          cardClass += "bg-white border-gray-200";
+        }
+
+        card.className = cardClass;
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div class="flex-1 cursor-pointer">
+              <h2 class="text-lg font-semibold">${habit.name}</h2>
+              <p class="text-sm text-gray-500">
+                ${habit.repeat_type} • 🔥 ${habit.streak} day streak
+              </p>
+              ${progressBar}
+            </div>
+            <button class="text-gray-500 hover:text-black px-2" onclick="editHabit(${habit.id})">⋮</button>
+          </div>
+        `;
+
+        let pressTimer;
+        let isLongPress = false;
+
+        card.addEventListener("pointerdown", (e) => {
+          if (e.target.tagName === "BUTTON") return;
+
+          didTriggerTap = false;
+
+          pressTimer = setTimeout(() => {
+            didTriggerTap = true;
+            handleHabitTap(habit, -1);
+            if (navigator.vibrate) {
+              navigator.vibrate(50);
+            }
+          }, 500);
+        });
+
+        card.addEventListener("pointerup", (e) => {
+          clearTimeout(pressTimer);
+
+          if (e.target.tagName === "BUTTON") return;
+          if (!didTriggerTap) {
+            handleHabitTap(habit, 1);
+          }
+        });
+
+        container.appendChild(card);
+      }
+
+      setTimeout(() => {
+        container.classList.remove("opacity-0");
+        container.classList.add("opacity-100");
+      }, 10);
+    }
+
+    async function handleHabitTap(habit, direction) {
+      let value = null;
+
+      if (habit.type === "binary") {
+        value = null;
+      } else if (habit.type === "countable") {
+        value = direction;
+      } else if (habit.type === "limit") {
+        value = direction;
+      }
+
+      await fetch(`${API_BASE}/habits/${habit.id}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, value }),
+      });
+
+      loadHabits();
+    }
+
+    async function loadAllHabits() {
+      const container = document.getElementById("manage-habit-list");
+
+      container.classList.remove("opacity-100");
+      container.classList.add("opacity-0");
+
+      const res = await fetch(`${API_BASE}/habits?user_id=${userId}`);
+      const habits = await res.json();
+      container.innerHTML = "";
+
+      for (let habit of habits) {
+        const card = document.createElement("div");
+        card.className =
+          "rounded-xl shadow-md p-4 mb-4 transition border bg-white border-gray-200";
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-lg font-semibold">${habit.name}</h2>
+              <p class="text-sm text-gray-500">
+                ${habit.repeat_type} • ${habit.tracked ? "Tracked" : "Untracked"}
+              </p>
+            </div>
+            <button class="text-gray-500 hover:text-black px-2" onclick="editHabit(${habit.id})">⋮</button>
+          </div>
+        `;
+
+        container.appendChild(card);
+      }
+
+      setTimeout(() => {
+        container.classList.remove("opacity-0");
+        container.classList.add("opacity-100");
+      }, 10);
+    }
+
+    function loadHeatmap() {
+      document.getElementById("progress-content").innerHTML = `
+        <div class="text-center text-gray-400 py-10">Heatmap coming soon!</div>
+      `;
+    }
+
+    function showPage(id) {
+      const pages = ["today", "manage", "progress"];
+      for (let page of pages) {
+        document.getElementById(`page-${page}`).classList.add("hidden");
+        document.getElementById(`tab-${page}`).classList.remove("text-green-600", "font-semibold");
+      }
+
+      document.getElementById(`page-${id}`).classList.remove("hidden");
+      document.getElementById(`tab-${id}`).classList.add("text-green-600", "font-semibold");
+
+      const fab = document.getElementById("add-habit-btn");
+      if (id === "progress") {
+        fab.classList.add("hidden");
+      } else {
+        fab.classList.remove("hidden");
+      }
+
+      if (id === "today") loadHabits();
+      if (id === "manage") loadAllHabits();
+      if (id === "progress") loadHeatmap();
+
+      lucide.createIcons();
+    }
+
+    function openAddHabitModal() {
+      document.getElementById("habit-modal").classList.remove("hidden");
+    }
+
+    function closeAddHabitModal() {
+      document.getElementById("habit-modal").classList.add("hidden");
+    }
+
+    async function createHabit(event) {
+      event.preventDefault();
+      const name = document.getElementById("habit-name").value;
+      const repeatType = document.getElementById("repeat-type").value;
+      const tracked = document.getElementById("tracked").checked;
+      const startDate = document.getElementById("start-date").value;
+      const type = document.getElementById("habit-type").value;
+      const targetRaw = document.getElementById("habit-target").value;
+      const target = targetRaw ? parseInt(targetRaw, 10) : null;
+
+      if (!name.trim()) return;
+
+      await fetch(`${API_BASE}/habits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, repeat_type: repeatType, tracked, user_id: userId, start_date: startDate, type, target }),
+      });
+
+      document.getElementById("habit-form").reset();
+      document.getElementById("habit-target").classList.add("hidden");
+      closeAddHabitModal();
+      loadHabits();
+    }
+
+    function closeEditHabitModal() {
+      document.getElementById("edit-habit-modal").classList.add("hidden");
+    }
+
+    async function editHabit(id) {
+      const res = await fetch(`${API_BASE}/habits/${id}?user_id=${userId}`);
+      const habit = await res.json();
+
+      document.getElementById("edit-habit-id").value = habit.id;
+      document.getElementById("edit-habit-name").value = habit.name;
+      document.getElementById("edit-repeat-type").value = habit.repeat_type;
+      document.getElementById("edit-start-date").value = habit.start_date;
+      document.getElementById("edit-tracked").checked = habit.tracked;
+
+      document.getElementById("edit-habit-modal").classList.remove("hidden");
+    }
+
+    async function submitEditHabit(event) {
+      event.preventDefault();
+
+      const user_id = userId;
+      const id = parseInt(document.getElementById("edit-habit-id").value, 10);
+      const name = document.getElementById("edit-habit-name").value;
+      const repeat_type = document.getElementById("edit-repeat-type").value;
+      const start_date = document.getElementById("edit-start-date").value;
+      const tracked = document.getElementById("edit-tracked").checked;
+      const type = document.getElementById("edit-habit-type").value;
+      const targetRaw = document.getElementById("edit-habit-target").value;
+      const target = targetRaw ? parseInt(targetRaw, 10) : null;
+
+      await fetch(`${API_BASE}/habits/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          id,
+          name,
+          repeat_type,
+          start_date,
+          tracked,
+          type,
+          target,
+        }),
+      });
+
+      closeEditHabitModal();
+      loadHabits();
+      loadAllHabits();
+    }
+
+    window.onload = () => {
+      showPage("today");
+      document.getElementById("habit-type").addEventListener("change", () => {
+        const type = document.getElementById("habit-type").value;
+        const targetInput = document.getElementById("habit-target");
+        if (type === "countable" || type === "limit") {
+          targetInput.classList.remove("hidden");
+        } else {
+          targetInput.classList.add("hidden");
+        }
+      });
+
+      document.getElementById("edit-habit-type").addEventListener("change", () => {
+        const type = document.getElementById("edit-habit-type").value;
+        const targetInput = document.getElementById("edit-habit-target");
+
+        if (type === "countable" || type === "limit") {
+          targetInput.classList.remove("hidden");
+        } else {
+          targetInput.classList.add("hidden");
+        }
+      });
+
+      document.getElementById("delete-habit-button").addEventListener("click", async () => {
+        const id = parseInt(document.getElementById("edit-habit-id").value, 10);
+        const confirmed = confirm("Are you sure you want to delete this habit? This cannot be undone.");
+
+        if (!confirmed) return;
+
+        try {
+          const response = await fetch(`${API_BASE}/habits/${id}?user_id=${userId}`, {
+            method: "DELETE",
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to delete habit.");
+          }
+
+          document.getElementById("edit-habit-type").value = habit.type;
+          document.getElementById("edit-habit-target").value = habit.target ?? "";
+          document.getElementById("edit-habit-type").dispatchEvent(new Event("change"));
+          closeEditHabitModal();
+          loadHabits();
+          loadAllHabits();
+        } catch (error) {
+          console.error("Error deleting habit:", error);
+          alert("Something went wrong while deleting the habit.");
+        }
+      });
+    };
+
+    function animateProgress(from, to, duration = 2600) {
+      const start = performance.now();
+      const path = document.getElementById("progress-path");
+      const text = document.getElementById("progress-text");
+
+      function easing(t) {
+        return 1 - Math.pow(1 - t, 3);
+      }
+
+      function update(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easing(progress);
+
+        const current = from + (to - from) * eased;
+
+        path.setAttribute("stroke-dasharray", `${current}, 100`);
+        text.textContent = `${Math.round(current)}%`;
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        }
+      }
+
+      requestAnimationFrame(update);
+    }
+  </script>
+</head>
+
+<body class="bg-gray-50 font-sans">
+  <!-- Pages -->
+  <main class="p-4 pb-20">
+    <!-- Today Page -->
+    <section id="page-today">
+      <h1 class="text-2xl font-bold mb-4">Today's Habits</h1>
+      <div class="mb-6">
+        <div class="text-center text-gray-500 text-sm mb-1">
+          Today’s Progress
+        </div>
+        <div class="flex justify-center transition-opacity duration-500 opacity-0" id="progress-wrapper">
+          <div class="relative w-28 h-28">
+            <svg class="w-full h-full" viewBox="0 0 36 36">
+              <path
+                class="text-gray-300 fill-none stroke-[3]"
+                stroke-linecap="round"
+                d="M18 2.0845
+                   a 15.9155 15.9155 0 0 1 0 31.831
+                   a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <path
+                id="progress-path"
+                class="fill-none stroke-green-500 stroke-[3]"
+                stroke-linecap="round"
+                stroke-dasharray="0, 100"
+                d="M18 2.0845
+                   a 15.9155 15.9155 0 0 1 0 31.831
+                   a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <text
+                id="progress-text"
+                x="18"
+                y="20.35"
+                class="fill-black text-[8px] text-center"
+                text-anchor="middle"
+              >
+                0%
+              </text>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div id="today-habit-list" class="opacity-0 transition-opacity duration-300"></div>
+    </section>
+
+    <!-- Manage Page -->
+    <section id="page-manage" class="hidden">
+      <h1 class="text-2xl font-bold mb-4">Manage Habits</h1>
+      <div id="manage-habit-list" class="opacity-0 transition-opacity duration-300"></div>
+    </section>
+
+    <!-- Progress Page -->
+    <section id="page-progress" class="hidden">
+      <h1 class="text-2xl font-bold mb-4">Progress</h1>
+      <div id="progress-content"></div>
+    </section>
+  </main>
+
+  <!-- Add Habit FAB -->
+  <button
+    id="add-habit-btn"
+    onclick="openAddHabitModal()"
+    class="fixed bottom-16 right-4 bg-green-600 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center hover:bg-green-700 z-50 transition-colors duration-200"
+  >
+    <i data-lucide="plus" class="w-6 h-6"></i>
+  </button>
+
+  <!-- Edit Habit Modal -->
+  <div id="edit-habit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white p-4 rounded-xl shadow-lg w-[90%] max-w-md">
+      <form id="edit-habit-form" onsubmit="submitEditHabit(event)">
+        <input type="hidden" id="edit-habit-id" />
+        <input type="text" id="edit-habit-name" placeholder="Habit name" class="w-full border p-2 rounded mb-2" />
+        <select id="edit-repeat-type" class="border p-2 rounded w-full mb-2">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="custom">Custom</option>
+        </select>
+        <select id="edit-habit-type" class="border p-2 rounded w-full mb-2">
+          <option value="binary">Binary</option>
+          <option value="countable">Countable</option>
+          <option value="limit">Limit</option>
+        </select>
+        <input
+          type="number"
+          id="edit-habit-target"
+          class="w-full border p-2 rounded mb-2 hidden"
+          placeholder="Target value"
+        />
+        <input type="date" id="edit-start-date" class="w-full border p-2 rounded mb-2" />
+        <label class="text-sm flex items-center gap-1 mb-2">
+          <input type="checkbox" id="edit-tracked" /> Tracked
+        </label>
+        <div class="flex justify-between mt-4">
+          <button
+            id="delete-habit-button"
+            type="button"
+            class="border border-red-500 text-red-500 px-4 py-2 rounded hover:bg-red-100 transition-colors"
+          >
+            Delete
+          </button>
+          <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Changes</button>
+        </div>
+        <div class="mt-2 text-right">
+          <button type="button" onclick="closeEditHabitModal()" class="text-gray-500">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 w-full bg-white shadow-md flex justify-around py-2 z-40 border-t">
+    <button id="tab-today" onclick="showPage('today')" class="flex flex-col items-center gap-1 text-sm">
+      <i data-lucide="calendar-check" class="w-5 h-5"></i>
+      Today
+    </button>
+    <button id="tab-manage" onclick="showPage('manage')" class="flex flex-col items-center gap-1 text-sm">
+      <i data-lucide="settings" class="w-5 h-5"></i>
+      Manage
+    </button>
+    <button id="tab-progress" onclick="showPage('progress')" class="flex flex-col items-center gap-1 text-sm">
+      <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+      Progress
+    </button>
+  </nav>
+
+  <!-- Habit Modal -->
+  <div id="habit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white p-4 rounded-xl shadow-lg w-[90%] max-w-md">
+      <form id="habit-form" onsubmit="createHabit(event)">
+        <input type="text" id="habit-name" placeholder="Habit name" class="w-full border p-2 rounded mb-2" />
+        <select id="repeat-type" class="border p-2 rounded w-full mb-2">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="custom">Custom</option>
+        </select>
+        <select id="habit-type" class="border p-2 rounded w-full mb-2">
+          <option value="binary">Binary</option>
+          <option value="countable">Countable</option>
+          <option value="limit">Limit</option>
+        </select>
+        <input type="number" id="habit-target" class="w-full border p-2 rounded mb-2 hidden" placeholder="Target value"/>
+        <input type="date" id="start-date" class="w-full border p-2 rounded mb-2" />
+        <label class="text-sm flex items-center gap-1 mb-2">
+          <input type="checkbox" id="tracked" checked /> Tracked
+        </label>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeAddHabitModal()" class="text-gray-500">Cancel</button>
+          <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Habit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
+
+
+
